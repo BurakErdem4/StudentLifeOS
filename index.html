@@ -146,7 +146,8 @@
             CalendarCheck: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><path d="M9 16l2 2 4-4"></path></svg>,
             Logout: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>,
             Edit: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>,
-            User: () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            User: () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>,
+            Settings: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
         };
 
         const DEFAULT_REWARDS = [
@@ -345,11 +346,9 @@
                 if (range === '6m') days = 180;
 
                 const now = new Date();
-                // End of the window: Current Now shifted by offset * duration
                 const endDate = new Date(now);
                 endDate.setDate(endDate.getDate() + (chartOffset * days));
 
-                // Start of the window: End - duration
                 const startDate = new Date(endDate);
                 startDate.setDate(startDate.getDate() - days);
 
@@ -363,15 +362,15 @@
                         id: p.id,
                         label: p.title,
                         data: [],
-                        rawValues: [], // For tooltip
-                        totalUnit: p.totalUnit || 100,
+                        rawValues: [],
+                        totalUnit: Number(p.totalUnit) || 100, // EXCEL KORUMASI EKLENDİ
                         unit: p.unit || 'br',
                         borderColor: colors[i % colors.length],
-                        backgroundColor: colors[i % colors.length] + '20', // Default weak fill
+                        backgroundColor: colors[i % colors.length] + '20',
                         borderWidth: 2,
-                        pointRadius: 0, // Clean line
+                        pointRadius: 0,
                         pointHoverRadius: 6,
-                        tension: 0.4, // Smooth curves
+                        tension: 0.4,
                         currentRawTotal: 0
                     };
                 });
@@ -383,6 +382,19 @@
                     allDates.push(new Date(iterator));
                     iterator.setDate(iterator.getDate() + 1);
                 }
+
+                // 🔥 ALT GÖREVLERİ (SUBITEMS) HESAPLAYAN AKILLI FONKSİYON 🔥
+                const calculateTaskGain = (task) => {
+                    // Eğer alt görev (kutucuklar) varsa, işaretli olanların sayısını döndür
+                    if (task.subItems && Array.isArray(task.subItems)) {
+                        return task.subItems.filter(Boolean).length;
+                    }
+                    // Alt görev yoksa ve tek seferlik görev tamamen bittiyse hedef miktarı döndür
+                    if (task.completed) {
+                        return Number(task.targetAmount) || 1;
+                    }
+                    return 0; // Hiçbiri değilse ilerleme yok
+                };
 
                 // 3a. Calculate Initial State (Sum of all tasks BEFORE startDate)
                 const projectInitialTotals = {};
@@ -398,8 +410,9 @@
                             if (dayData && dayData.tasks) {
                                 student.projects.forEach(p => {
                                     const gained = dayData.tasks
-                                        .filter(t => t.pid === p.id && t.completed)
-                                        .reduce((acc, t) => acc + (t.targetAmount || 0), 0);
+                                        // ID_ KORUMASI
+                                        .filter(t => String(t.pid).replace("ID_", "") === String(p.id).replace("ID_", ""))
+                                        .reduce((acc, t) => acc + calculateTaskGain(t), 0); // YENİ FONKSİYON KULLANILDI
                                     projectInitialTotals[p.id] += gained;
                                 });
                             }
@@ -421,19 +434,18 @@
 
                     student.projects.forEach(p => {
                         const gainedToday = (dayData.tasks || [])
-                            .filter(t => t.pid === p.id && t.completed)
-                            .reduce((acc, t) => acc + (t.targetAmount || 0), 0);
+                            // ID_ KORUMASI
+                            .filter(t => String(t.pid).replace("ID_", "") === String(p.id).replace("ID_", ""))
+                            .reduce((acc, t) => acc + calculateTaskGain(t), 0); // YENİ FONKSİYON KULLANILDI
 
                         projectData[p.id].currentRawTotal += gainedToday;
 
                         // DATA LOGIC: Cumulative vs Velocity
                         if (metric === 'cumulative') {
-                            // Cumulative %
                             const pct = Math.min(100, (projectData[p.id].currentRawTotal / projectData[p.id].totalUnit) * 100);
                             projectData[p.id].data.push(pct);
                             projectData[p.id].rawValues.push(projectData[p.id].currentRawTotal);
                         } else {
-                            // Velocity % (Daily Increment)
                             const dailyPct = (gainedToday / projectData[p.id].totalUnit) * 100;
                             projectData[p.id].data.push(dailyPct);
                             projectData[p.id].rawValues.push(gainedToday);
@@ -444,7 +456,8 @@
                 // --- FILTER LOGIC ---
                 let filteredDatasets = Object.values(projectData);
                 if (activeFilter !== 'ALL') {
-                    filteredDatasets = filteredDatasets.filter(ds => ds.id === activeFilter);
+                    // ID_ KORUMASI
+                    filteredDatasets = filteredDatasets.filter(ds => String(ds.id).replace("ID_", "") === String(activeFilter).replace("ID_", ""));
                 }
 
                 // 4. Create Chart
@@ -455,7 +468,6 @@
                 let yMax = 100;
 
                 if (metric === 'cumulative') {
-                    // --- RELATIVE TIERED SCALING (Cumulative) ---
                     let startValue = 100;
                     let hasData = false;
 
@@ -492,38 +504,27 @@
                     yMax = Math.min(startValue + targetRange, 100);
 
                 } else {
-                    // --- VELOCITY SCALING (Fixed Baseline 12) ---
-                    // If max > 12, Chart.js auto-scales. If max < 12, it stays 0-12.
                     yMax = undefined;
                 }
 
-                // Volume Style for Velocity
                 filteredDatasets.forEach(ds => {
-                    if (metric === 'velocity') {
-                        ds.fill = true;
-                    }
+                    if (metric === 'velocity') ds.fill = true;
                 });
 
                 chartInstance.current = new Chart(ctx, {
                     type: 'line',
-                    data: {
-                        labels,
-                        datasets: filteredDatasets
-                    },
+                    data: { labels, datasets: filteredDatasets },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        interaction: {
-                            mode: 'index',
-                            intersect: false,
-                        },
+                        interaction: { mode: 'index', intersect: false },
                         scales: {
                             y: {
                                 beginAtZero: metric === 'velocity',
                                 min: yMin,
-                                max: yMax, // Undefined for Velocity (auto-scale)
-                                suggestedMax: metric === 'velocity' ? 12 : undefined, // Baseline 12
-                                grid: { color: 'rgba(255,255,255,0.05)' }, // Dark mode grid
+                                max: yMax,
+                                suggestedMax: metric === 'velocity' ? 12 : undefined,
+                                grid: { color: 'rgba(255,255,255,0.05)' },
                                 ticks: { color: '#9ca3af' },
                                 border: { display: false }
                             },
@@ -615,7 +616,6 @@
                 </div>
             );
         };
-
         // --- VELİ BİLEŞENLERİ ---
 
         const PairingCodeCard = ({ userId, existingCode, updateCloud }) => {
@@ -1845,18 +1845,23 @@
 
             const handleEditProject = () => {
                 if (!modal.data) return;
-                const updated = projects.map(p => {
-                    if (p.id === modal.data.id) {
+                const p = modal.data;
+                const finalTotal = form.total !== undefined && form.total !== '' ? Number(form.total) : Number(p.totalUnit);
+                const finalCurrent = form.current !== undefined && form.current !== '' ? Number(form.current) : Number(p.currentUnit);
+                if (finalTotal <= 0) { if (!confirm('⚠️ Toplam birim 0 veya negatif. Yine de kaydetmek istiyor musun?')) return; }
+                else if (finalCurrent > finalTotal) { if (!confirm(`⚠️ Yapılan (${finalCurrent}) toplam hedeften (${finalTotal}) büyük. Yine de kaydetmek istiyor musun?`)) return; }
+                const updated = projects.map(proj => {
+                    if (proj.id === p.id) {
                         return {
-                            ...p,
-                            title: form.title || p.title,
-                            totalUnit: form.total || p.totalUnit,
-                            unit: form.unit || p.unit,
-                            currentUnit: form.current !== undefined ? Number(form.current) : p.currentUnit,
-                            totalEstTime: form.estTime || p.totalEstTime
+                            ...proj,
+                            title: form.title !== undefined ? form.title : p.title,
+                            totalUnit: form.total !== undefined && form.total !== '' ? Number(form.total) : p.totalUnit,
+                            unit: form.unit !== undefined ? form.unit : p.unit,
+                            currentUnit: form.current !== undefined && form.current !== '' ? Number(form.current) : p.currentUnit,
+                            totalEstTime: form.estTime !== undefined && form.estTime !== '' ? Number(form.estTime) : p.totalEstTime
                         };
                     }
-                    return p;
+                    return proj;
                 });
                 updateCloud('projects', updated);
                 setModal({ open: false });
@@ -1867,7 +1872,7 @@
                 if (type === 'simple') {
                     newTask = { id: Date.now(), title: form.title, type: 'simple', completed: false, duration: form.time || '30', startTime: form.startTime || '' };
                 } else if (type === 'import') {
-                    const p = modal.data || projects.find(pro => String(pro.id) === String(form.projectId));
+                    const p = modal.data || projects.find(pro => String(pro.id).replace("ID_", "") === String(form.projectId).replace("ID_", ""));
                     if (!p) return alert("Lütfen bir proje seçin!");
                     const amount = Number(form.amount) || 1;
                     let calculatedDuration = form.time;
@@ -1905,10 +1910,10 @@
                 newSubItems[index] = !wasDone;
 
                 if (task.type === 'project_slice') {
-                    const targetProject = projects.find(p => p.id === task.pid);
+                    const targetProject = projects.find(p => String(p.id).replace("ID_", "") === String(task.pid).replace("ID_", ""));
                     if (targetProject) {
                         const newCurrent = Math.min(targetProject.totalUnit, Math.max(0, targetProject.currentUnit + (wasDone ? -1 : 1)));
-                        const updatedProjects = projects.map(p => p.id === task.pid ? { ...p, currentUnit: newCurrent } : p);
+                        const updatedProjects = projects.map(p => String(p.id).replace("ID_", "") === String(task.pid).replace("ID_", "") ? { ...p, currentUnit: newCurrent } : p);
                         updateCloud('projects', updatedProjects);
                     }
                 }
@@ -2436,7 +2441,7 @@
                                     .filter(r => r['Başlık'])
                                     .map(r => {
                                         const proj = {
-                                            id: r['ID'] || Date.now() + Math.random(),
+                                            id: String(r['ID'] || Date.now() + Math.random()),
                                             title: r['Başlık'],
                                             totalUnit: Number(r['Toplam Birim']) || 0,
                                             currentUnit: Number(r['Mevcut Birim']) || 0,
@@ -2462,14 +2467,14 @@
                                     const key = String(r['Tarih']);
                                     if (!historyObj[key]) historyObj[key] = { tasks: [], habits: [], journal: null };
                                     const task = {
-                                        id: r['ID'] || Date.now() + Math.random(),
+                                        id: String(r['ID'] || Date.now() + Math.random()),
                                         title: r['Görev'],
                                         type: r['Tür'] || 'simple',
                                         completed: r['Tamamlandı'] === 'Evet',
                                         duration: String(r['Süre (dk)'] || '30'),
                                         startTime: r['Başlangıç'] || ''
                                     };
-                                    if (r['Proje ID']) task.pid = r['Proje ID'];
+                                    if (r['Proje ID']) task.pid = String(r['Proje ID']);
                                     if (r['Proje Başlık']) task.projectTitle = r['Proje Başlık'];
                                     if (r['Hedef Miktar']) task.targetAmount = Number(r['Hedef Miktar']);
                                     if (r['Alt Öğeler (JSON)']) {
@@ -2493,7 +2498,7 @@
                                     const key = String(r['Tarih']);
                                     if (!result.history[key]) result.history[key] = { tasks: [], habits: [], journal: null };
                                     if (r['Tür'] === 'Alışkanlık' && r['Alışkanlık ID']) {
-                                        result.history[key].habits.push(r['Alışkanlık ID']);
+                                        result.history[key].habits.push(String(r['Alışkanlık ID']));
                                     }
                                     if (r['Tür'] === 'Günlük') {
                                         result.history[key].journal = { mood: r['Ruh Hali'] || '', note: r['Günlük Notu'] || r['Günlük'] || '' };
@@ -2505,7 +2510,7 @@
                             if (wb.SheetNames.includes('Alışkanlıklar')) {
                                 const rows = XLSX.utils.sheet_to_json(wb.Sheets['Alışkanlıklar']);
                                 const habits = rows.filter(r => r['Başlık']).map(r => ({
-                                    id: r['ID'] || 'h_' + Date.now() + Math.random(),
+                                    id: String(r['ID'] || 'h_' + Date.now() + Math.random()),
                                     title: r['Başlık'],
                                     icon: r['Emoji'] || '✨'
                                 }));
@@ -2519,7 +2524,7 @@
                             if (wb.SheetNames.includes('Ödüller')) {
                                 const rows = XLSX.utils.sheet_to_json(wb.Sheets['Ödüller']);
                                 const rewards = rows.filter(r => r['Başlık']).map(r => ({
-                                    id: r['ID'] || Date.now() + Math.random(),
+                                    id: String(r['ID'] || Date.now() + Math.random()),
                                     title: r['Başlık'],
                                     cost: Number(r['Maliyet']) || 0,
                                     icon: r['Emoji'] || '🎁'
@@ -3082,6 +3087,72 @@
                 color: 'from-orange-400 to-amber-500',
                 isBundle: false, // TEKİL
                 defaultNotes: `HER GÜN ÇÖZÜLECEK:\n- [ ] Paragrafta Ana Düşünce\n- [ ] Paragrafta Yardımcı Düşünce\n- [ ] Paragrafta Yapı\n- [ ] Anlatım Teknikleri`
+            },
+            {
+                id: 'bundle_9sinif_soru',
+                title: '9. Sinif Basari Kampi (Soru)',
+                desc: '9. Sinif MEB mufredati soru bankasi hedefleri.',
+                icon: '🟦',
+                color: 'from-blue-500 to-blue-700',
+                totalUnit: 1290, unit: 'Sayfa', totalEstTime: 215,
+                isBundle: true,
+                items: [
+                    { title: 'Matematik Soru', totalUnit: 300, unit: 'Sayfa', totalEstTime: 50 },
+                    { title: 'Fizik Soru', totalUnit: 180, unit: 'Sayfa', totalEstTime: 30 },
+                    { title: 'Kimya Soru', totalUnit: 180, unit: 'Sayfa', totalEstTime: 30 },
+                    { title: 'Biyoloji Soru', totalUnit: 180, unit: 'Sayfa', totalEstTime: 30 },
+                    { title: 'Turkce Soru', totalUnit: 150, unit: 'Sayfa', totalEstTime: 25 },
+                    { title: 'Tarih Soru', totalUnit: 150, unit: 'Sayfa', totalEstTime: 25 },
+                    { title: 'Cografya Soru', totalUnit: 150, unit: 'Sayfa', totalEstTime: 25 }
+                ]
+            },
+            {
+                id: 'bundle_9sinif_konu',
+                title: '9. Sinif Basari Kampi (Konu)',
+                desc: '9. Sinif MEB mufredati konu anlatim hedefleri.',
+                icon: '🟧',
+                color: 'from-orange-400 to-orange-600',
+                totalUnit: 258, unit: 'Kisim', totalEstTime: 109,
+                isBundle: true,
+                items: [
+                    { title: 'Matematik Konu', totalUnit: 60, unit: 'Kisim', totalEstTime: 25 },
+                    { title: 'Fizik Konu', totalUnit: 36, unit: 'Kisim', totalEstTime: 15 },
+                    { title: 'Kimya Konu', totalUnit: 36, unit: 'Kisim', totalEstTime: 15 },
+                    { title: 'Biyoloji Konu', totalUnit: 36, unit: 'Kisim', totalEstTime: 15 },
+                    { title: 'Turkce Konu', totalUnit: 30, unit: 'Kisim', totalEstTime: 13 },
+                    { title: 'Tarih Konu', totalUnit: 30, unit: 'Kisim', totalEstTime: 13 },
+                    { title: 'Cografya Konu', totalUnit: 30, unit: 'Kisim', totalEstTime: 13 }
+                ]
+            },
+            {
+                id: 't_9sinif_kitap',
+                title: 'Kitap Kurdu (min 5+ sayfa)',
+                desc: 'Duzenli kitap okuma aliskanligi (Gunde 5+ Sayfa)',
+                totalUnit: 1000,
+                unit: 'Sayfa',
+                totalEstTime: 25,
+                icon: '📚',
+                color: 'from-purple-500 to-violet-600',
+                isBundle: false,
+                defaultNotes: `OKUMA HEDEFİ:
+- [ ] Her gun en az 5 sayfa
+- [ ] Haftada 1 bolum bitir
+- [ ] Okuduklarini not al`
+            },
+            {
+                id: 't_aylik_tekrar',
+                title: 'Aylik Okul Tekrari',
+                desc: 'O gun okulda islenenlerin 30 dakikalik tekrari.',
+                totalUnit: 30,
+                unit: 'Gun',
+                totalEstTime: 15,
+                icon: '🎒',
+                color: 'from-green-500 to-emerald-600',
+                isBundle: false,
+                defaultNotes: `GUNLUK TEKRAR:
+- [ ] Bugun islenen konulari gozden gecir
+- [ ] Anlamadigin yerleri isaretle
+- [ ] Kisa ozet cikar`
             }
         ];
 
@@ -3095,7 +3166,8 @@
             handleAddTask, toggleTask, toggleSubItem, deleteTask,
             addHabit, deleteHabit, toggleHabit,
             handlePurchase, handleStartFocus, handleStopFocus,
-            dateKey, todayKey, currentDayData, updateCloud
+            handleAddReward, handleDeleteReward,
+            dateKey, todayKey, currentDayData, updateCloud, streakFreeze
         }) => {
             const localFlippedProjects = flippedProjects || {};
             const [calendarMode, setCalendarMode] = React.useState('day');
@@ -3183,6 +3255,86 @@
             };
             const { days: daysInMonth, firstDay: firstDayOfMonth } = getDaysInMonth(currentMonth);
 
+            // Streak hesaplama
+            const calculateStreak = (hist) => {
+                const gdk = (d) => {
+                    const y = d.getFullYear();
+                    const m = String(d.getMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${dd}`;
+                };
+                const isDayQualified = (dayData) => {
+                    if (!dayData) return false;
+                    if (dayData.frozen === true) return true;
+                    const tasks = dayData.tasks || [];
+                    const hasTask = tasks.some(t => t.completed || (t.subItems && t.subItems.some(Boolean)));
+                    const hasHabit = (dayData.habits || []).length > 0;
+                    return hasTask && hasHabit;
+                };
+                let streak = 0;
+                const today = new Date();
+                const todayData = hist[gdk(today)];
+                let startFromToday = isDayQualified(todayData);
+                if (startFromToday) streak = 1;
+                const cursor = new Date(today);
+                cursor.setDate(cursor.getDate() - 1);
+                for (let i = 0; i < 365; i++) {
+                    const key = gdk(cursor);
+                    if (isDayQualified(hist[key])) {
+                        streak++;
+                    } else {
+                        if (!startFromToday && i === 0) {
+                            cursor.setDate(cursor.getDate() - 1);
+                            continue;
+                        }
+                        break;
+                    }
+                    cursor.setDate(cursor.getDate() - 1);
+                }
+                return streak;
+            };
+            const streak = calculateStreak(history);
+
+            // Haftalık odak ve rütbe hesaplama
+            const calculateWeeklyFocus = (hist) => {
+                const gdk = (d) => {
+                    const y = d.getFullYear();
+                    const m = String(d.getMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${dd}`;
+                };
+                let totalMin = 0;
+                for (let i = 0; i < 7; i++) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - i);
+                    const dayData = hist[gdk(d)];
+                    if (!dayData || !dayData.tasks) continue;
+                    totalMin += dayData.tasks.reduce((acc, t) => {
+                        if (t.completed) return acc + (Number(t.duration) || 0);
+                        if (t.subItems && t.subItems.length > 0) {
+                            const doneCount = t.subItems.filter(Boolean).length;
+                            return acc + ((Number(t.duration) || 0) * (doneCount / t.subItems.length));
+                        }
+                        return acc;
+                    }, 0);
+                }
+                return Math.round(totalMin);
+            };
+            const weeklyFocusMin = calculateWeeklyFocus(history);
+            const weeklyHours = weeklyFocusMin / 60;
+
+            const getRank = (h) => {
+                if (h >= 26) return { emoji: '💎', title: 'Yenilmez Makine', gradient: 'linear-gradient(135deg, #6366f1, #a855f7, #ec4899)', textColor: '#fff', next: null, threshold: 26 };
+                if (h >= 24) return { emoji: '🚀', title: 'Efsanevi Momentum', gradient: 'linear-gradient(135deg, #f59e0b, #ef4444)', textColor: '#fff', next: 26, threshold: 24 };
+                if (h >= 21) return { emoji: '🛡️', title: 'Disiplin Ustası', gradient: 'linear-gradient(135deg, #3b82f6, #6366f1)', textColor: '#fff', next: 24, threshold: 21 };
+                if (h >= 17) return { emoji: '⚔️', title: 'İstikrarlı Savaşçı', gradient: 'linear-gradient(135deg, #ef4444, #f97316)', textColor: '#fff', next: 21, threshold: 17 };
+                if (h >= 12) return { emoji: '🎯', title: 'Odak Avcısı', gradient: 'linear-gradient(135deg, #10b981, #059669)', textColor: '#fff', next: 17, threshold: 12 };
+                if (h >= 8) return { emoji: '🚶‍♂️', title: 'Isınma Turu', gradient: 'linear-gradient(135deg, #f59e0b, #fbbf24)', textColor: '#78350f', next: 12, threshold: 8 };
+                if (h >= 4) return { emoji: '🌱', title: 'Odak Çaylağı', gradient: 'linear-gradient(135deg, #a3e635, #65a30d)', textColor: '#fff', next: 8, threshold: 4 };
+                return { emoji: '💤', title: 'Uyuyan Dev', gradient: 'linear-gradient(135deg, #94a3b8, #64748b)', textColor: '#fff', next: 4, threshold: 0 };
+            };
+            const rank = getRank(weeklyHours);
+
             const renderHeader = () => (
                 <div className="flex justify-between items-start px-5 pt-12 pb-2 bg-white sticky top-0 z-20">
                     <div>
@@ -3191,6 +3343,12 @@
                             <div className="px-3 py-1.5 rounded-xl flex items-center gap-2 transition-colors" style={{ backgroundColor: dayStatus.color }}>
                                 <span className="text-xs font-bold" style={{ color: dayStatus.textColor }}>{dayStatus.text}</span>
                             </div>
+                            {streak > 0 && (
+                                <div className="flex items-center gap-1 px-2.5 py-1.5 bg-orange-50 rounded-xl">
+                                    <span className="text-sm">🔥</span>
+                                    <span className="text-xs font-black text-orange-600">{streak}</span>
+                                </div>
+                            )}
                             <button onClick={() => openModal('journal')} className="p-1.5 hover:bg-gray-50 rounded-lg text-gray-400 transition">
                                 <Icons.Journal />
                             </button>
@@ -3253,6 +3411,28 @@
                         </div>
                     </div>
 
+                    {(() => {
+                        const totalMin = Math.round((currentDayData.tasks || []).reduce((acc, t) => {
+                            if (t.completed) return acc + (Number(t.duration) || 0);
+                            if (t.subItems && t.subItems.length > 0) {
+                                const doneCount = t.subItems.filter(Boolean).length;
+                                const progress = doneCount / t.subItems.length;
+                                return acc + ((Number(t.duration) || 0) * progress);
+                            }
+                            return acc;
+                        }, 0));
+                        if (totalMin <= 0) return null;
+                        const h = Math.floor(totalMin / 60);
+                        const m = totalMin % 60;
+                        return (
+                            <div className="flex items-center justify-center gap-2 py-2">
+                                <span className="text-lg">🎯</span>
+                                <span className="font-bold text-gray-500 text-sm">Bugün Odaklanılan Süre:</span>
+                                <span className="font-black text-indigo-600 text-sm">{h > 0 ? `${h} sa ${m > 0 ? m + ' dk' : ''}` : `${m} dk`}</span>
+                            </div>
+                        );
+                    })()}
+
                     <button onClick={() => openModal('taskId', null)} className="w-full border-2 border-dashed border-indigo-200 bg-indigo-50/30 py-4 rounded-2xl flex items-center justify-center gap-2 text-indigo-400 font-bold hover:bg-indigo-50 hover:border-indigo-300 transition-all">
                         <Icons.Plus />
                         <span>Görev Ekle</span>
@@ -3305,6 +3485,33 @@
             );
             const renderMonthView = () => (
                 <div className="px-5 pb-24 animate-fade-in">
+                    <div className="mb-4 -mx-0">
+                        <div className="relative overflow-hidden rounded-2xl p-4" style={{ background: rank.gradient }}>
+                            <div className="absolute top-0 right-0 opacity-10 text-[80px] leading-none -mt-2 -mr-2 select-none">{rank.emoji}</div>
+                            <div className="relative z-10">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <span className="text-2xl">{rank.emoji}</span>
+                                    <div>
+                                        <div className="font-black text-sm" style={{ color: rank.textColor }}>{rank.title}</div>
+                                        <div className="text-[10px] font-bold opacity-80" style={{ color: rank.textColor }}>
+                                            Son 7 Gün: {Math.floor(weeklyHours)}s {Math.round(weeklyFocusMin % 60)}dk
+                                        </div>
+                                    </div>
+                                </div>
+                                {rank.next && (
+                                    <div>
+                                        <div className="flex justify-between text-[9px] font-bold mb-1 opacity-70" style={{ color: rank.textColor }}>
+                                            <span>{rank.threshold}s</span>
+                                            <span>{rank.next}s</span>
+                                        </div>
+                                        <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
+                                            <div className="h-full bg-white/80 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, ((weeklyHours - rank.threshold) / (rank.next - rank.threshold)) * 100)}%` }} />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                     <div className="flex items-center justify-between mb-6 pt-2">
                         <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} className="p-2 bg-gray-50 rounded-lg text-gray-500"><Icons.ChevronLeft /></button>
                         <h2 className="text-xl font-bold text-gray-800">
@@ -3418,10 +3625,13 @@
                                     </button>
                                 </div>
                                 {projects.map(p => {
-                                    const percent = p.totalUnit > 0 ? Math.round((p.currentUnit / p.totalUnit) * 100) : 0;
-                                    const remaining = Math.max(0, p.totalUnit - p.currentUnit);
-                                    const totalHours = p.totalEstTime || 0;
-                                    const hoursLeft = totalHours > 0 && p.totalUnit > 0 ? Math.round(remaining * (totalHours / p.totalUnit)) : null;
+                                    const totalU = Number(p.totalUnit) || 1;
+                                    const currentU = Number(p.currentUnit) || 0;
+                                    const estTime = Number(p.totalEstTime) || 0;
+
+                                    const percent = Math.min(100, Math.round((currentU / totalU) * 100));
+                                    const remaining = Math.max(0, totalU - currentU);
+                                    const hoursLeft = Math.round(remaining * (estTime / totalU));
                                     const isFlipped = localFlippedProjects[p.id];
 
                                     return (
@@ -3517,61 +3727,20 @@
 
                         {activeTab === 'routines' && (
                             <div className="space-y-6 animate-fade-in pb-24 p-5">
-                                <div className="flex justify-between items-center px-1">
-                                    <h1 className="text-2xl font-bold text-gray-800">Profil & Gelişim</h1>
-                                    <span className="text-xs bg-gray-100 text-gray-500 px-3 py-1 rounded-full font-bold">V 2.0</span>
-                                </div>
-
-                                {/* SEGMENTED CONTROL */}
-                                <div className="bg-gray-100 p-1 rounded-xl flex font-bold text-xs mb-4">
-                                    <button onClick={() => setProfileView('analytics')} className={`flex-1 py-2.5 rounded-lg transition-all shadow-sm ${profileView === 'analytics' ? 'bg-white text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}>
-                                        📊 İlerleme & Analiz
-                                    </button>
-                                    <button onClick={() => setProfileView('routines')} className={`flex-1 py-2.5 rounded-lg transition-all shadow-sm ${profileView === 'routines' ? 'bg-white text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}>
-                                        📝 Günlük Rutinler
+                                <div className="flex justify-between items-center px-1 mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <h1 className="text-2xl font-bold text-gray-800">Profil & Gelişim</h1>
+                                        <span className="text-xs bg-gray-100 text-gray-500 px-3 py-1 rounded-full font-bold">V 2.0</span>
+                                    </div>
+                                    <button onClick={() => openModal('settings')} className="bg-gray-100 text-gray-500 p-2 rounded-xl hover:bg-gray-200 hover:text-gray-700 transition">
+                                        <Icons.Settings />
                                     </button>
                                 </div>
 
-                                {/* VIEW CONTENT */}
-                                {profileView === 'analytics' && (
-                                    <div className="animate-fade-in">
-                                        <AnalysisView student={studentData} />
-                                    </div>
-                                )}
-
-                                {profileView === 'routines' && (
-                                    <div className="animate-fade-in space-y-4">
-                                        <div className="bg-orange-50 p-6 rounded-3xl border border-orange-100 text-center">
-                                            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">🌅</div>
-                                            <h3 className="text-lg font-bold text-orange-900 mb-1">Yeni Bir Alışkanlık</h3>
-                                            <p className="text-orange-700/70 text-sm mb-4">Küçük adımlar büyük değişimler yaratır.</p>
-
-                                            <div className="flex gap-2">
-                                                <input placeholder="Örn: 10 Sayfa Kitap Oku" className="flex-1 p-3 rounded-xl border border-orange-200 text-sm focus:ring-2 ring-orange-400 outline-none"
-                                                    value={form.title || ''} onChange={e => setForm({ ...form, title: e.target.value })} />
-                                                <button onClick={() => { if (form.title) { addHabit(); setForm({ title: '' }); } }} className="bg-orange-500 hover:bg-orange-600 text-white p-3 rounded-xl font-bold transition shadow-lg shadow-orange-200">
-                                                    <Icons.Plus />
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-3">
-                                            <h3 className="font-bold text-gray-800 px-2">Mevcut Rutinlerin</h3>
-                                            {habits.map(h => (
-                                                <div key={h.id} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center justify-between group">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-xl">{h.icon}</div>
-                                                        <div className="font-bold text-gray-800">{h.title}</div>
-                                                    </div>
-                                                    <button onClick={() => deleteHabit(h.id)} className="text-gray-300 hover:text-red-500 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <Icons.Trash />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                            {habits.length === 0 && <div className="text-center text-gray-400 py-4 text-sm">Listede henüz alışkanlık yok.</div>}
-                                        </div>
-                                    </div>
-                                )}
+                                {/* SEGMENTED CONTROL KALDIRILDI - ANALİTIK DİREKT GÖSTERİLİYOR */}
+                                <div className="animate-fade-in">
+                                    <AnalysisView student={studentData} />
+                                </div>
 
                                 {/* VELİ BAĞLANTISI */}
                                 <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-6 rounded-3xl border border-amber-200 mt-6">
@@ -3642,10 +3811,36 @@
                         {activeTab === 'store' && (
                             <div className="p-5 pb-24 animate-fade-in">
                                 <h2 className="text-2xl font-bold text-gray-800 mb-6">Mağaza</h2>
+
+                                <div className="mb-6 relative overflow-hidden rounded-2xl p-4 border border-cyan-200" style={{ background: 'linear-gradient(135deg, #e0f2fe, #cffafe, #a5f3fc)' }}>
+                                    <div className="absolute top-0 right-0 opacity-10 text-[70px] leading-none -mt-1 -mr-1 select-none">&#x1F9CA;</div>
+                                    <div className="relative z-10 flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-3xl">&#x1F9CA;</span>
+                                            <div>
+                                                <div className="font-black text-sm text-cyan-900">Seri Dondurucu</div>
+                                                <div className="text-[10px] font-bold text-cyan-700">Seriyi kaybetmeden 1 g&#xFC;n atla</div>
+                                                <div className="text-[10px] font-bold text-cyan-600 mt-0.5">Mevcut: {streakFreeze}/2</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col items-end gap-1">
+                                            <div className="bg-yellow-100 text-yellow-800 text-[10px] font-black px-2 py-0.5 rounded-full">500 GP</div>
+                                            <button
+                                                onClick={() => { if (gold >= 500 && streakFreeze < 2 && confirm('Seri Dondurucu satin alinsin mi? (500 altin)')) { updateCloud('gold', gold - 500); updateCloud('streakFreeze', streakFreeze + 1); } }}
+                                                disabled={gold < 500 || streakFreeze >= 2}
+                                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition ${gold >= 500 && streakFreeze < 2 ? 'bg-cyan-600 text-white hover:bg-cyan-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                                            >
+                                                {streakFreeze >= 2 ? 'Maksimum' : 'Satin Al'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div className="grid grid-cols-2 gap-4">
                                     {rewards.map(r => (
                                         <div key={r.id} onClick={() => setFlippedCards({ ...flippedCards, [r.id]: !flippedCards[r.id] })}
                                             className="aspect-square bg-gray-50 rounded-2xl flex flex-col items-center justify-center p-4 border border-gray-100 relative group">
+                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteReward(r.id); }} className="absolute top-2 right-2 w-6 h-6 bg-red-100 text-red-400 rounded-full text-xs font-bold opacity-0 group-hover:opacity-100 transition hover:bg-red-200 hover:text-red-600 flex items-center justify-center">✕</button>
                                             {flippedCards[r.id] ? (
                                                 <button onClick={(e) => { e.stopPropagation(); handlePurchase(r); }} className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold">Satın Al</button>
                                             ) : (
@@ -3802,14 +3997,14 @@
                                                 </div>
 
                                                 <div className="text-center mb-6">
-                                                    <h3 className="text-indigo-600 font-bold text-lg">{projects.find(p => p.id === form.projectId)?.title}</h3>
+                                                    <h3 className="text-indigo-600 font-bold text-lg">{projects.find(p => String(p.id) === String(form.projectId))?.title}</h3>
                                                 </div>
 
                                                 <div className="flex items-center justify-center gap-4 mb-6">
                                                     <div className="flex items-center bg-gray-50 rounded-2xl p-2 border border-gray-100">
                                                         <input type="number" className="w-16 bg-transparent text-center font-bold text-2xl outline-none text-gray-800" value={form.amount || ''} onChange={e => {
                                                             const val = e.target.value;
-                                                            const p = projects.find(pr => pr.id === form.projectId);
+                                                            const p = projects.find(pr => String(pr.id) === String(form.projectId));
                                                             let time = '';
                                                             if (val && p && p.totalEstTime && p.totalUnit) {
                                                                 const timePerUnit = (p.totalEstTime * 60) / p.totalUnit;
@@ -3837,13 +4032,13 @@
                                 {modal.type === 'project' && (
                                     <div className="space-y-4">
                                         <h2 className="text-xl font-bold text-gray-800">{modal.data ? 'Hedefi Düzenle' : 'Yeni Hedef'}</h2>
-                                        <input placeholder="Hedef Adı (örn: Matematik)" className="w-full p-4 bg-gray-50 rounded-xl font-bold text-gray-700 outline-none" value={form.title || modal.data?.title || ''} onChange={e => setForm({ ...form, title: e.target.value })} />
+                                        <input placeholder="Hedef Adı (örn: Matematik)" className="w-full p-4 bg-gray-50 rounded-xl font-bold text-gray-700 outline-none" value={form.title !== undefined ? form.title : (modal.data?.title ?? '')} onChange={e => setForm({ ...form, title: e.target.value })} />
                                         <div className="grid grid-cols-2 gap-2">
-                                            <input type="number" placeholder="Toplam" className="w-full p-4 bg-gray-50 rounded-xl font-bold text-gray-700 outline-none" value={form.total || modal.data?.totalUnit || ''} onChange={e => setForm({ ...form, total: e.target.value })} />
-                                            <input placeholder="Birim (Soru, Sayfa)" className="w-full p-4 bg-gray-50 rounded-xl font-bold text-gray-700 outline-none" value={form.unit || modal.data?.unit || ''} onChange={e => setForm({ ...form, unit: e.target.value })} />
+                                            <input type="number" placeholder="Toplam" className="w-full p-4 bg-gray-50 rounded-xl font-bold text-gray-700 outline-none" value={form.total !== undefined ? form.total : (modal.data?.totalUnit ?? '')} onChange={e => setForm({ ...form, total: e.target.value })} />
+                                            <input placeholder="Birim (Soru, Sayfa)" className="w-full p-4 bg-gray-50 rounded-xl font-bold text-gray-700 outline-none" value={form.unit !== undefined ? form.unit : (modal.data?.unit ?? '')} onChange={e => setForm({ ...form, unit: e.target.value })} />
                                         </div>
-                                        <input type="number" placeholder="Şu anki Durum" className="w-full p-4 bg-gray-50 rounded-xl font-bold text-gray-700 outline-none" value={form.current || modal.data?.currentUnit || ''} onChange={e => setForm({ ...form, current: e.target.value })} />
-                                        <input type="number" placeholder="Tahmini Toplam Saat" className="w-full p-4 bg-gray-50 rounded-xl font-bold text-gray-700 outline-none" value={form.estTime || modal.data?.totalEstTime || ''} onChange={e => setForm({ ...form, estTime: e.target.value })} />
+                                        <input type="number" placeholder="Şu anki Durum" className="w-full p-4 bg-gray-50 rounded-xl font-bold text-gray-700 outline-none" value={form.current !== undefined ? form.current : (modal.data?.currentUnit ?? '')} onChange={e => setForm({ ...form, current: e.target.value })} />
+                                        <input type="number" placeholder="Tahmini Toplam Saat" className="w-full p-4 bg-gray-50 rounded-xl font-bold text-gray-700 outline-none" value={form.estTime !== undefined ? form.estTime : (modal.data?.totalEstTime ?? '')} onChange={e => setForm({ ...form, estTime: e.target.value })} />
 
                                         <button onClick={modal.data ? handleEditProject : handleAddProject} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition">{modal.data ? 'Kaydet' : 'Oluştur'}</button>
                                     </div>
@@ -3852,9 +4047,177 @@
                                 {modal.type === 'reward' && (
                                     <div className="space-y-4">
                                         <h2 className="text-xl font-bold text-gray-800">Yeni Ödül</h2>
-                                        <input placeholder="Ödül Adı" className="w-full p-4 bg-gray-50 rounded-xl font-bold text-gray-700 outline-none" value={form.title || ''} onChange={e => setForm({ ...form, title: e.target.value })} />
+                                        <div className="flex gap-2">
+                                            <input placeholder="🎁" className="w-16 p-4 bg-gray-50 rounded-xl font-bold text-2xl text-center outline-none" value={form.icon || ''} onChange={e => setForm({ ...form, icon: e.target.value })} />
+                                            <input placeholder="Ödül Adı" className="flex-1 p-4 bg-gray-50 rounded-xl font-bold text-gray-700 outline-none" value={form.title || ''} onChange={e => setForm({ ...form, title: e.target.value })} />
+                                        </div>
                                         <input type="number" placeholder="Maliyet (GP)" className="w-full p-4 bg-gray-50 rounded-xl font-bold text-gray-700 outline-none" value={form.cost || ''} onChange={e => setForm({ ...form, cost: e.target.value })} />
                                         <button onClick={handleAddReward} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition">Ekle</button>
+                                    </div>
+                                )}
+
+                                {modal.type === 'settings' && (
+                                    <div className="space-y-6">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h2 className="text-xl font-bold text-gray-800">Ayarlar</h2>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <button onClick={() => openModal('settings_profile')} className="w-full bg-white border border-gray-100 p-4 rounded-2xl font-bold text-gray-700 flex items-center gap-4 hover:border-gray-200 transition group">
+                                                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                    <Icons.User />
+                                                </div>
+                                                <span className="flex-1 text-left">Profil Ayarlari</span>
+                                                <Icons.ChevronRight />
+                                            </button>
+                                            <button onClick={() => openModal('settings_routines')} className="w-full bg-white border border-gray-100 p-4 rounded-2xl font-bold text-gray-700 flex items-center gap-4 hover:border-gray-200 transition group">
+                                                <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+                                                    🌅
+                                                </div>
+                                                <span className="flex-1 text-left">Gunluk Rutinler Ayarlari</span>
+                                                <Icons.ChevronRight />
+                                            </button>
+                                            <button onClick={() => openModal('settings_messages')} className="w-full bg-white border border-gray-100 p-4 rounded-2xl font-bold text-gray-700 flex items-center gap-4 hover:border-gray-200 transition group">
+                                                <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-500 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+                                                    💬
+                                                </div>
+                                                <span className="flex-1 text-left">Mentordan Mesajlar</span>
+                                                <Icons.ChevronRight />
+                                            </button>
+                                        </div>
+
+                                        <div className="pt-2">
+                                            <button onClick={() => { closeModal(); auth.signOut(); }} className="w-full bg-red-50 text-red-600 p-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition">
+                                                <Icons.Logout />
+                                                Cikis Yap
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {modal.type === 'settings_profile' && (
+                                    <div className="space-y-6">
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <button onClick={() => openModal('settings')} className="p-2 -ml-2 text-gray-400 hover:text-gray-600 transition"><Icons.ChevronLeft /></button>
+                                            <h2 className="text-xl font-bold text-gray-800">Profil Ayarlari</h2>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider shrink-0">GİRİŞ BİLGİLERİ</label>
+
+                                            <div className="bg-gray-50 border border-gray-100 p-4 rounded-2xl">
+                                                <div className="text-xs font-bold text-gray-400 mb-1">İsim</div>
+                                                <input
+                                                    readOnly
+                                                    value={profile?.name || 'İsimsiz Öğrenci'}
+                                                    className="w-full bg-transparent font-bold text-gray-800 outline-none"
+                                                />
+                                            </div>
+
+                                            <div className="bg-gray-50 border border-gray-100 p-4 rounded-2xl">
+                                                <div className="text-xs font-bold text-gray-400 mb-1">E-posta Adresi</div>
+                                                <input
+                                                    readOnly
+                                                    value={user?.email || profile?.email || 'Bilinmiyor'}
+                                                    className="w-full bg-transparent font-bold text-gray-800 outline-none"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">HESAP İŞLEMLERİ</label>
+                                            <button onClick={() => alert('Bu özellik çok yakında eklenecek!')} className="w-full bg-white border border-gray-100 p-4 rounded-2xl font-bold text-gray-700 flex justify-between items-center hover:border-gray-200 transition">
+                                                <span>Kullanici Adi Degistir</span>
+                                                <Icons.ChevronRight />
+                                            </button>
+                                            <button onClick={() => alert('Bu özellik çok yakında eklenecek!')} className="w-full bg-white border border-gray-100 p-4 rounded-2xl font-bold text-gray-700 flex justify-between items-center hover:border-gray-200 transition">
+                                                <span>Sifre Guncelle</span>
+                                                <Icons.ChevronRight />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {modal.type === 'settings_messages' && (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <button onClick={() => openModal('settings')} className="p-2 -ml-2 text-gray-400 hover:text-gray-600 transition"><Icons.ChevronLeft /></button>
+                                            <h2 className="text-xl font-bold text-gray-800">Mentordan Mesajlar</h2>
+                                        </div>
+
+                                        <div className="space-y-3 max-h-[500px] overflow-y-auto no-scrollbar">
+                                            {(!profile?.mentorMessages || profile.mentorMessages.length === 0) ? (
+                                                <div className="text-center py-10 text-gray-400">
+                                                    <div className="text-4xl mb-3 opacity-50">📬</div>
+                                                    <p className="font-medium">Henüz mentordan bir mesaj almadın.</p>
+                                                </div>
+                                            ) : (
+                                                profile.mentorMessages.slice(0, 5).map((msg, index) => (
+                                                    <div key={msg.id || index} className="bg-white border border-gray-100 p-4 rounded-2xl shadow-sm hover:border-indigo-100 transition relative overflow-hidden group">
+                                                        <div className="absolute top-0 left-0 w-1 h-full bg-indigo-400"></div>
+                                                        <div className="flex justify-between items-start mb-2 pl-2">
+                                                            <div className="font-bold text-gray-800 flex items-center gap-2">
+                                                                {msg.title || 'Mentorun Mesajı'}
+                                                            </div>
+                                                            <div className="text-xs text-gray-400 font-medium whitespace-nowrap">
+                                                                {new Date(msg.timestamp).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                                                            </div>
+                                                        </div>
+                                                        <p className="text-gray-600 text-sm mb-3 pl-2 leading-relaxed">
+                                                            {msg.message}
+                                                        </p>
+                                                        {msg.gold > 0 && (
+                                                            <div className="pl-2">
+                                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-xs font-bold border border-amber-100">
+                                                                    🪙 +{msg.gold} Altın
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {modal.type === 'settings_routines' && (
+                                    <div className="space-y-6">
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <button onClick={() => openModal('settings')} className="p-2 -ml-2 text-gray-400 hover:text-gray-600 transition"><Icons.ChevronLeft /></button>
+                                            <h2 className="text-xl font-bold text-gray-800">Gunluk Rutinler Ayarlari</h2>
+                                        </div>
+
+                                        <div className="bg-orange-50 p-6 rounded-3xl border border-orange-100 text-center">
+                                            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">🌅</div>
+                                            <h3 className="text-lg font-bold text-orange-900 mb-1">Yeni Bir Alışkanlık</h3>
+                                            <p className="text-orange-700/70 text-sm mb-4">Küçük adımlar büyük değişimler yaratır.</p>
+
+                                            <div className="flex gap-2">
+                                                <input placeholder="✨" className="w-12 p-3 rounded-xl border border-orange-200 text-center text-xl outline-none focus:ring-2 ring-orange-400"
+                                                    value={form.icon || ''} onChange={e => setForm({ ...form, icon: e.target.value })} />
+                                                <input placeholder="Örn: 10 Sayfa Kitap Oku" className="flex-1 w-full max-w-[200px] p-3 rounded-xl border border-orange-200 text-sm focus:ring-2 ring-orange-400 outline-none"
+                                                    value={form.title || ''} onChange={e => setForm({ ...form, title: e.target.value })} />
+                                                <button onClick={() => { if (form.title) { addHabit(); setForm({ title: '', icon: '' }); } }} className="bg-orange-500 hover:bg-orange-600 text-white p-3 rounded-xl font-bold transition shadow-lg shadow-orange-200 shrink-0">
+                                                    <Icons.Plus />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3 max-h-[400px] overflow-y-auto no-scrollbar">
+                                            <h3 className="font-bold text-gray-800 px-2 mt-4">Mevcut Rutinlerin</h3>
+                                            {habits.map(h => (
+                                                <div key={h.id} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center justify-between group">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-xl">{h.icon}</div>
+                                                        <div className="font-bold text-gray-800">{h.title}</div>
+                                                    </div>
+                                                    <button onClick={() => deleteHabit(h.id)} className="text-gray-300 hover:text-red-500 p-2 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                                                        <Icons.Trash />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                            {habits.length === 0 && <div className="text-center text-gray-400 py-4 text-sm">Listede henüz alışkanlık yok.</div>}
+                                        </div>
                                     </div>
                                 )}
 
@@ -3969,6 +4332,7 @@
             const [habits, setHabits] = useState([]);
             const [rewards, setRewards] = useState([]);
             const [gold, setGold] = useState(0);
+            const [streakFreeze, setStreakFreeze] = useState(0);
             const [flippedCards, setFlippedCards] = useState({});
             const [flippedProjects, setFlippedProjects] = useState({});
             const [focusMode, setFocusMode] = useState({ active: false, taskId: null, taskTitle: '', timeLeft: 0, isRunning: false });
@@ -4038,6 +4402,20 @@
 
             const closeNotification = () => {
                 if (notificationModal) {
+                    // Save to persistent profile messages before deleting
+                    const currentMessages = profile?.mentorMessages || [];
+                    const newMessage = {
+                        id: notificationModal.id,
+                        title: notificationModal.title || 'Mesaj',
+                        message: notificationModal.message || '',
+                        gold: notificationModal.gold || 0,
+                        timestamp: notificationModal.timestamp || Date.now(),
+                        type: notificationModal.type || 'message'
+                    };
+                    const updatedMessages = [newMessage, ...currentMessages].slice(0, 50); // Keep last 50
+                    updateCloud('profile/mentorMessages', updatedMessages);
+
+                    // Remove from temporary notifications
                     db.ref(`users/${user.uid}/notifications/${notificationModal.id}`).remove();
                     setNotificationModal(null);
                 }
@@ -4054,10 +4432,42 @@
                         setHabits(data.habits || DEFAULT_HABITS);
                         setRewards(data.rewards || DEFAULT_REWARDS);
                         setGold(data.gold || 0);
+                        setStreakFreeze(data.streakFreeze || 0);
                     }
                 });
                 return () => userRef.off();
             }, [user]);
+
+            // Streak Freeze auto-consume
+            useEffect(() => {
+                if (!user || !history || Object.keys(history).length === 0 || streakFreeze <= 0) return;
+                const gdk = (d) => {
+                    const y = d.getFullYear();
+                    const m = String(d.getMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${dd}`;
+                };
+                const isDayFailed = (dayData) => {
+                    if (!dayData) return true;
+                    if (dayData.frozen === true) return false;
+                    const tasks = dayData.tasks || [];
+                    const hasTask = tasks.some(t => t.completed || (t.subItems && t.subItems.some(Boolean)));
+                    const hasHabit = (dayData.habits || []).length > 0;
+                    return !(hasTask && hasHabit);
+                };
+                let freezesLeft = streakFreeze;
+                for (let i = 1; i <= 3 && freezesLeft > 0; i++) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - i);
+                    const key = gdk(d);
+                    const dayData = history[key];
+                    if (isDayFailed(dayData)) {
+                        updateCloud(`history/${key}/frozen`, true);
+                        freezesLeft--;
+                        updateCloud('streakFreeze', freezesLeft);
+                    }
+                }
+            }, [user, history, streakFreeze]);
 
             const getDateKey = (date) => {
                 const year = date.getFullYear();
@@ -4092,7 +4502,7 @@
                 if (type === 'simple') {
                     newTask = { id: Date.now(), title: form.title, type: 'simple', completed: false, duration: form.time || '30', startTime: form.startTime || '' };
                 } else if (type === 'import') {
-                    const p = modal.data || projects.find(pro => pro.id === Number(form.projectId));
+                    const p = modal.data || projects.find(pro => String(pro.id).replace("ID_", "") === String(form.projectId).replace("ID_", ""));
                     if (!p) return alert("Lütfen bir proje seçin!");
                     const amount = Number(form.amount) || 1;
                     let calculatedDuration = form.time;
@@ -4128,10 +4538,10 @@
                 newSubItems[index] = !wasDone;
 
                 if (task.type === 'project_slice') {
-                    const targetProject = projects.find(p => p.id === task.pid);
+                    const targetProject = projects.find(p => String(p.id) === String(task.pid));
                     if (targetProject) {
                         const newCurrent = Math.min(targetProject.totalUnit, Math.max(0, targetProject.currentUnit + (wasDone ? -1 : 1)));
-                        const updatedProjects = projects.map(p => p.id === task.pid ? { ...p, currentUnit: newCurrent } : p);
+                        const updatedProjects = projects.map(p => String(p.id) === String(task.pid) ? { ...p, currentUnit: newCurrent } : p);
                         updateCloud('projects', updatedProjects);
                     }
                 }
@@ -4180,39 +4590,20 @@
             };
             const handleEditProject = () => {
                 const p = modal.data;
-                const newTotal = Number(form.total) || 100;
-                const newCurrent = Number(form.current) || 0;
-                const newTitle = form.title || p.title;
-                const newUnit = form.unit || 'br';
-                const newEstTime = Number(form.estTime) || 0;
+                if (!p) return;
+                const newTitle = form.title !== undefined ? form.title : p.title;
+                const newTotal = form.total !== undefined && form.total !== '' ? Number(form.total) : Number(p.totalUnit) || 100;
+                const newUnit = form.unit !== undefined ? form.unit : (p.unit || 'br');
+                const newEstTime = form.estTime !== undefined && form.estTime !== '' ? Number(form.estTime) : Number(p.totalEstTime) || 0;
+                const newCurrent = form.current !== undefined && form.current !== '' ? Number(form.current) : Number(p.currentUnit) || 0;
 
-                // LOGIC: Calculate new initialUnit based on newCurrent and historical progress
-                // 1. Calculate how much progress was made via tasks (history)
-                // We don't have direct access to 'progressFromTasks' here easily without iterating ALL history.
-                // Alternative: We can persist 'initialUnit'. 
-                // FORMULA: currentUnit = initialUnit + progressFromTasks
-                // THEREFORE: progressFromTasks = oldCurrent - oldInitial
+                if (newTotal <= 0) { if (!confirm('⚠️ Toplam birim 0 veya negatif. Yine de kaydetmek istiyor musun?')) return; }
+                else if (newCurrent > newTotal) { if (!confirm(`⚠️ Yapılan (${newCurrent}) toplam hedeften (${newTotal}) büyük. Yine de kaydetmek istiyor musun?`)) return; }
 
                 const oldInitial = Number(p.initialUnit) || 0;
                 const oldCurrent = Number(p.currentUnit) || 0;
                 const progressFromTasks = Math.max(0, oldCurrent - oldInitial);
-
-                // 2. New Initial Unit = newCurrent - progressFromTasks
                 let newInitial = newCurrent - progressFromTasks;
-
-                // Edge case: If user reduces current below what was done in tasks, newInitial might be negative. 
-                // Or if they want to reset 'initial' explicitly?
-                // The prompt says: "User enters new current... system calculates new initial".
-                // This implies 'progressFromTasks' is the constant truth we want to preserve.
-
-                // Let's trust the calc. If negative, it means tasks alone account for more than the new current? 
-                // That implies data inconsistency (tasks say 50 done, but user sets current to 40).
-                // In that case, we might need to adjust. But for now, let's allow it or clamp to 0?
-                // If initial is negative, it means we "owe" progress? Probably 0 is safe floor, but that desyncs total.
-                // Let's keep it simple: strict math.
-
-                // Wait, if I change 'initialUnit', I might affect analytics for 'Cumulative'.
-                // Yes, that's the point.
 
                 const updatedProjects = projects.map(proj => proj.id === p.id ? {
                     ...proj,
@@ -4227,7 +4618,7 @@
                 updateCloud('projects', updatedProjects);
                 closeModal();
             };
-            const handleBuyReward = (r) => { if (gold >= r.cost && confirm('Satın almak istiyor musun?')) updateGold(-r.cost); };
+            const handleBuyReward = (r) => { if (gold >= r.cost && confirm(`${r.icon || '🎁'} "${r.title}" — ${r.cost} altın`)) updateGold(-r.cost); };
             const handleAddReward = () => { if (form.title) { updateCloud('rewards', [...rewards, { id: Date.now(), title: form.title, cost: Number(form.cost), icon: form.icon || '🎁' }]); closeModal(); } };
             const handleDeleteReward = (id) => { if (confirm('Silmek istediğine emin misin?')) updateCloud('rewards', rewards.filter(r => r.id !== id)); };
             const closeModal = () => setModal({ open: false, type: null, data: null });
@@ -4284,6 +4675,7 @@
                     todayKey={todayKey}
                     currentDayData={currentDayData}
                     updateCloud={updateCloud}
+                    streakFreeze={streakFreeze}
                 />
             );
         }
