@@ -1,0 +1,2730 @@
+// --- STUDENT UI (exportToExcel, importFromExcel, STUDY_TEMPLATES, StudentUI, Calendar, ProfileTab) ---
+// Extracted from index.html. Uses globals: db, auth, React, useState, useEffect, Icons, ProjectAnalyticsChart
+
+// --- ANA STUDENT UI BİLEŞENİ ---
+// --- 1. HAZIR ŞABLON VERİSİ (REVİZELİ & SOSYAL EKLENDİ) ---
+// ========== EXCEL IMPORT / EXPORT UTILITIES (TAM YEDEKLEME) ==========
+
+const exportToExcel = (userData, fileName = 'StudentLifeOS_Yedek') => {
+    try {
+        const wb = XLSX.utils.book_new();
+
+        // Sheet 1: Profil (tüm metadata)
+        const profilData = [{
+            'Ad Soyad': userData.profile?.name || '',
+            'E-posta': userData.profile?.email || '',
+            'Rol': userData.profile?.role || 'student',
+            'Sınıf ID': userData.profile?.classId || '',
+            'Altın': userData.gold || 0,
+            'Mağaza Kilitli': userData.profile?.storeLocked ? 'Evet' : 'Hayır',
+            'Eşleştirme Kodu': userData.profile?.pairingCode || '',
+            'Yedek Tarihi': new Date().toLocaleString('tr-TR')
+        }];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(profilData), 'Profil');
+
+        // Sheet 2: Hedefler (tüm alanlar)
+        const hedeflerData = (userData.projects || []).map(p => ({
+            'ID': p.id,
+            'Başlık': p.title,
+            'Toplam Birim': p.totalUnit || 0,
+            'Mevcut Birim': p.currentUnit || 0,
+            'Birim': p.unit || 'Sayfa',
+            'İlerleme %': p.totalUnit > 0 ? Math.round(((p.currentUnit || 0) / p.totalUnit) * 100) : 0,
+            'Tahmini Süre (saat)': p.totalEstTime || 0,
+            'Kalan Tahmini Saat': p.totalEstTime && p.totalUnit ? Math.round((p.totalEstTime * Math.max(0, (p.totalUnit - (p.currentUnit || 0)) / p.totalUnit)) * 10) / 10 : 0,
+            'Notlar': p.notes || '',
+            'Paket mi': p.isBundle ? 'Evet' : 'Hayır',
+            'Alt Öğeler (JSON)': p.items ? JSON.stringify(p.items) : ''
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+            hedeflerData.length > 0 ? hedeflerData : [{ 'Bilgi': 'Henüz hedef yok.' }]
+        ), 'Hedefler');
+
+        // Sheet 3: Geçmiş — Görevler (her tarih, her görev, tüm alanlar)
+        const gecmisData = [];
+        const history = userData.history || {};
+        Object.keys(history).sort().forEach(dateKey => {
+            const day = history[dateKey];
+            (day.tasks || []).forEach(t => {
+                gecmisData.push({
+                    'Tarih': dateKey,
+                    'ID': t.id || '',
+                    'Görev': t.title || '',
+                    'Tür': t.type || 'simple',
+                    'Tamamlandı': t.completed ? 'Evet' : 'Hayır',
+                    'Süre (dk)': t.duration || '',
+                    'Başlangıç': t.startTime || '',
+                    'Proje ID': t.pid || '',
+                    'Proje Başlık': t.projectTitle || '',
+                    'Hedef Miktar': t.targetAmount || '',
+                    'Alt Öğeler (JSON)': t.subItems ? JSON.stringify(t.subItems) : '',
+                    'Atayan': t.assignedBy || '',
+                    'Silinebilir': t.allowDelete === undefined ? '' : (t.allowDelete ? 'Evet' : 'Hayır')
+                });
+            });
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+            gecmisData.length > 0 ? gecmisData : [{ 'Bilgi': 'Henüz geçmiş yok.' }]
+        ), 'Geçmiş');
+
+        // Sheet 4: Alışkanlıklar (tanımlar)
+        const habitsData = (userData.habits || []).map(h => ({
+            'ID': h.id,
+            'Başlık': h.title,
+            'Emoji': h.icon || ''
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+            habitsData.length > 0 ? habitsData : [{ 'Bilgi': 'Varsayılan alışkanlıklar kullanılıyor.' }]
+        ), 'Alışkanlıklar');
+
+        // Sheet 5: Günlük Rutin Geçmişi (hangi gün hangi alışkanlık yapıldı + günlük)
+        const rutinData = [];
+        Object.keys(history).sort().forEach(dateKey => {
+            const day = history[dateKey];
+            (day.habits || []).forEach(hId => {
+                rutinData.push({ 'Tarih': dateKey, 'Tür': 'Alışkanlık', 'Alışkanlık ID': hId, 'Ruh Hali': '', 'Günlük Notu': '' });
+            });
+            if (day.journal) {
+                const j = typeof day.journal === 'object' ? day.journal : { mood: '', note: day.journal };
+                rutinData.push({ 'Tarih': dateKey, 'Tür': 'Günlük', 'Alışkanlık ID': '', 'Ruh Hali': j.mood || '', 'Günlük Notu': j.note || '' });
+            }
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+            rutinData.length > 0 ? rutinData : [{ 'Bilgi': 'Henüz rutin verisi yok.' }]
+        ), 'Rutin Geçmişi');
+
+        // Sheet 6: Ödüller / Mağaza
+        const rewardsData = (userData.rewards || []).map(r => ({
+            'ID': r.id,
+            'Başlık': r.title,
+            'Maliyet': r.cost,
+            'Emoji': r.icon || ''
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+            rewardsData.length > 0 ? rewardsData : [{ 'Bilgi': 'Varsayılan ödüller kullanılıyor.' }]
+        ), 'Ödüller');
+
+        XLSX.writeFile(wb, `${fileName}.xlsx`);
+        return { success: true, message: '✅ Tam yedek başarıyla indirildi! (6 sayfa)' };
+    } catch (err) {
+        console.error('Excel export error:', err);
+        return { success: false, message: 'Hata: Excel dosyası oluşturulamadı.' };
+    }
+};
+
+const importFromExcel = (file) => {
+    return new Promise((resolve, reject) => {
+        try {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const wb = XLSX.read(data, { type: 'array' });
+                    const result = {};
+                    const stats = { projects: 0, days: 0, habits: 0, rewards: 0 };
+
+                    // Parse Profil
+                    if (wb.SheetNames.includes('Profil')) {
+                        const rows = XLSX.utils.sheet_to_json(wb.Sheets['Profil']);
+                        if (rows[0]) {
+                            result.gold = Number(rows[0]['Altın']) || 0;
+                            // profile fields are informational; we don't overwrite name/email/role
+                        }
+                    }
+
+                    // Parse Hedefler
+                    if (wb.SheetNames.includes('Hedefler')) {
+                        const rows = XLSX.utils.sheet_to_json(wb.Sheets['Hedefler']);
+                        result.projects = rows
+                            .filter(r => r['Başlık'])
+                            .map(r => {
+                                const proj = {
+                                    id: String(r['ID'] || Date.now() + Math.random()),
+                                    title: r['Başlık'],
+                                    totalUnit: Number(r['Toplam Birim']) || 0,
+                                    currentUnit: Number(r['Mevcut Birim']) || 0,
+                                    unit: r['Birim'] || 'Sayfa',
+                                    totalEstTime: Number(r['Tahmini Süre (saat)']) || 0,
+                                    notes: r['Notlar'] || ''
+                                };
+                                if (r['Paket mi'] === 'Evet') proj.isBundle = true;
+                                if (r['Alt Öğeler (JSON)']) {
+                                    try { proj.items = JSON.parse(r['Alt Öğeler (JSON)']); } catch (e) { }
+                                }
+                                return proj;
+                            });
+                        stats.projects = result.projects.length;
+                    }
+
+                    // Parse Geçmiş
+                    if (wb.SheetNames.includes('Geçmiş')) {
+                        const rows = XLSX.utils.sheet_to_json(wb.Sheets['Geçmiş']);
+                        const historyObj = {};
+                        rows.forEach(r => {
+                            if (!r['Tarih'] || !r['Görev']) return;
+                            const key = String(r['Tarih']);
+                            if (!historyObj[key]) historyObj[key] = { tasks: [], habits: [], journal: null };
+                            const task = {
+                                id: String(r['ID'] || Date.now() + Math.random()),
+                                title: r['Görev'],
+                                type: r['Tür'] || 'simple',
+                                completed: r['Tamamlandı'] === 'Evet',
+                                duration: String(r['Süre (dk)'] || '30'),
+                                startTime: r['Başlangıç'] || ''
+                            };
+                            if (r['Proje ID']) task.pid = String(r['Proje ID']);
+                            if (r['Proje Başlık']) task.projectTitle = r['Proje Başlık'];
+                            if (r['Hedef Miktar']) task.targetAmount = Number(r['Hedef Miktar']);
+                            if (r['Alt Öğeler (JSON)']) {
+                                try { task.subItems = JSON.parse(r['Alt Öğeler (JSON)']); } catch (e) { }
+                            }
+                            if (r['Atayan']) task.assignedBy = r['Atayan'];
+                            if (r['Silinebilir'] === 'Evet') task.allowDelete = true;
+                            if (r['Silinebilir'] === 'Hayır') task.allowDelete = false;
+                            historyObj[key].tasks.push(task);
+                        });
+                        result.history = historyObj;
+                        stats.days = Object.keys(historyObj).length;
+                    }
+
+                    // Parse Rutin Geçmişi (merge into history)
+                    if (wb.SheetNames.includes('Rutin Geçmişi')) {
+                        const rows = XLSX.utils.sheet_to_json(wb.Sheets['Rutin Geçmişi']);
+                        if (!result.history) result.history = {};
+                        rows.forEach(r => {
+                            if (!r['Tarih']) return;
+                            const key = String(r['Tarih']);
+                            if (!result.history[key]) result.history[key] = { tasks: [], habits: [], journal: null };
+                            if (r['Tür'] === 'Alışkanlık' && r['Alışkanlık ID']) {
+                                result.history[key].habits.push(String(r['Alışkanlık ID']));
+                            }
+                            if (r['Tür'] === 'Günlük') {
+                                result.history[key].journal = { mood: r['Ruh Hali'] || '', note: r['Günlük Notu'] || r['Günlük'] || '' };
+                            }
+                        });
+                    }
+
+                    // Parse Alışkanlıklar
+                    if (wb.SheetNames.includes('Alışkanlıklar')) {
+                        const rows = XLSX.utils.sheet_to_json(wb.Sheets['Alışkanlıklar']);
+                        const habits = rows.filter(r => r['Başlık']).map(r => ({
+                            id: String(r['ID'] || 'h_' + Date.now() + Math.random()),
+                            title: r['Başlık'],
+                            icon: r['Emoji'] || '✨'
+                        }));
+                        if (habits.length > 0) {
+                            result.habits = habits;
+                            stats.habits = habits.length;
+                        }
+                    }
+
+                    // Parse Ödüller
+                    if (wb.SheetNames.includes('Ödüller')) {
+                        const rows = XLSX.utils.sheet_to_json(wb.Sheets['Ödüller']);
+                        const rewards = rows.filter(r => r['Başlık']).map(r => ({
+                            id: String(r['ID'] || Date.now() + Math.random()),
+                            title: r['Başlık'],
+                            cost: Number(r['Maliyet']) || 0,
+                            icon: r['Emoji'] || '🎁'
+                        }));
+                        if (rewards.length > 0) {
+                            result.rewards = rewards;
+                            stats.rewards = rewards.length;
+                        }
+                    }
+
+                    resolve({ data: result, stats, success: true });
+                } catch (parseErr) {
+                    console.error('Import parse error:', parseErr);
+                    reject({ success: false, message: 'Hata: Geçersiz dosya formatı. Lütfen uygun bir Excel dosyası seçin.' });
+                }
+            };
+            reader.onerror = () => reject({ success: false, message: 'Hata: Dosya okunamadı.' });
+            reader.readAsArrayBuffer(file);
+        } catch (err) {
+            reject({ success: false, message: 'Hata: Dosya işlenemedi.' });
+        }
+    });
+};
+
+const exportAllStudents = (students, fileName = 'Kurum_Yedek') => {
+    try {
+        const wb = XLSX.utils.book_new();
+
+        // Sheet 1: Öğrenci Listesi (özet + UID)
+        const listeData = students.map(s => {
+            const projects = s.projects || [];
+            const totalUnits = projects.reduce((sum, p) => sum + (p.totalUnit || 0), 0);
+            const currentUnits = projects.reduce((sum, p) => sum + (p.currentUnit || 0), 0);
+            const historyDays = s.history ? Object.keys(s.history).length : 0;
+            const totalTasks = s.history ? Object.values(s.history).reduce((sum, d) => sum + (d.tasks?.length || 0), 0) : 0;
+            const completedTasks = s.history ? Object.values(s.history).reduce((sum, d) => sum + (d.tasks?.filter(t => t.completed)?.length || 0), 0) : 0;
+            const goalNames = projects.map(p => p.title).join(', ');
+            return {
+                'UID': s.uid || '',
+                'Ad Soyad': s.profile?.name || '',
+                'E-posta': s.profile?.email || '',
+                'Sınıf ID': s.profile?.classId || '',
+                'Altın': s.gold || 0,
+                'Hedef Sayısı': projects.length,
+                'Hedef Listesi': goalNames,
+                'Genel İlerleme %': totalUnits > 0 ? Math.round((currentUnits / totalUnits) * 100) : 0,
+                'Aktif Gün Sayısı': historyDays,
+                'Toplam Görev': totalTasks,
+                'Tamamlanan Görev': completedTasks,
+                'Mağaza Kilitli': s.profile?.storeLocked ? 'Evet' : 'Hayır'
+            };
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(listeData), 'Öğrenci Listesi');
+
+        // Sheet 2: Tüm Hedefler (her öğrencinin tüm hedefleri)
+        const tumHedefler = [];
+        students.forEach(s => {
+            (s.projects || []).forEach(p => {
+                tumHedefler.push({
+                    'UID': s.uid || '',
+                    'Öğrenci': s.profile?.name || '',
+                    'Sınıf ID': s.profile?.classId || '',
+                    'Hedef ID': p.id,
+                    'Başlık': p.title,
+                    'Toplam Birim': p.totalUnit || 0,
+                    'Mevcut Birim': p.currentUnit || 0,
+                    'Birim': p.unit || 'Sayfa',
+                    'İlerleme %': p.totalUnit > 0 ? Math.round(((p.currentUnit || 0) / p.totalUnit) * 100) : 0,
+                    'Tahmini Süre (saat)': p.totalEstTime || 0,
+                    'Kalan Tahmini Saat': p.totalEstTime && p.totalUnit ? Math.round((p.totalEstTime * Math.max(0, (p.totalUnit - (p.currentUnit || 0)) / p.totalUnit)) * 10) / 10 : 0,
+                    'Notlar': p.notes || '',
+                    'Paket mi': p.isBundle ? 'Evet' : 'Hayır',
+                    'Alt Öğeler (JSON)': p.items ? JSON.stringify(p.items) : ''
+                });
+            });
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+            tumHedefler.length > 0 ? tumHedefler : [{ 'Bilgi': 'Henüz hedef verisi yok.' }]
+        ), 'Tüm Hedefler');
+
+        // Sheet 3: Tüm Geçmiş (her öğrencinin tüm görev geçmişi)
+        const tumGecmis = [];
+        students.forEach(s => {
+            const history = s.history || {};
+            Object.keys(history).sort().forEach(dateKey => {
+                const day = history[dateKey];
+                (day.tasks || []).forEach(t => {
+                    tumGecmis.push({
+                        'UID': s.uid || '',
+                        'Öğrenci': s.profile?.name || '',
+                        'Tarih': dateKey,
+                        'ID': t.id || '',
+                        'Görev': t.title || '',
+                        'Tür': t.type || 'simple',
+                        'Tamamlandı': t.completed ? 'Evet' : 'Hayır',
+                        'Süre (dk)': t.duration || '',
+                        'Başlangıç': t.startTime || '',
+                        'Proje ID': t.pid || '',
+                        'Proje Başlık': t.projectTitle || '',
+                        'Hedef Miktar': t.targetAmount || '',
+                        'Alt Öğeler (JSON)': t.subItems ? JSON.stringify(t.subItems) : '',
+                        'Atayan': t.assignedBy || '',
+                        'Silinebilir': t.allowDelete === undefined ? '' : (t.allowDelete ? 'Evet' : 'Hayır')
+                    });
+                });
+            });
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+            tumGecmis.length > 0 ? tumGecmis : [{ 'Bilgi': 'Henüz geçmiş verisi yok.' }]
+        ), 'Tüm Geçmiş');
+
+        // Sheet 4: Tüm Rutin Geçmişi
+        const tumRutin = [];
+        students.forEach(s => {
+            const history = s.history || {};
+            Object.keys(history).sort().forEach(dateKey => {
+                const day = history[dateKey];
+                (day.habits || []).forEach(hId => {
+                    tumRutin.push({ 'UID': s.uid || '', 'Öğrenci': s.profile?.name || '', 'Tarih': dateKey, 'Tür': 'Alışkanlık', 'Alışkanlık ID': hId, 'Ruh Hali': '', 'Günlük Notu': '' });
+                });
+                if (day.journal) {
+                    const j = typeof day.journal === 'object' ? day.journal : { mood: '', note: day.journal };
+                    tumRutin.push({ 'UID': s.uid || '', 'Öğrenci': s.profile?.name || '', 'Tarih': dateKey, 'Tür': 'Günlük', 'Alışkanlık ID': '', 'Ruh Hali': j.mood || '', 'Günlük Notu': j.note || '' });
+                }
+            });
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+            tumRutin.length > 0 ? tumRutin : [{ 'Bilgi': 'Henüz rutin verisi yok.' }]
+        ), 'Tüm Rutinler');
+
+        XLSX.writeFile(wb, `${fileName}.xlsx`);
+        return { success: true, message: `✅ ${students.length} öğrencinin TAM verisi dışa aktarıldı! (${tumHedefler.length} hedef, ${tumGecmis.length} görev kaydı)` };
+    } catch (err) {
+        console.error('Bulk export error:', err);
+        return { success: false, message: 'Hata: Toplu dışa aktarma başarısız.' };
+    }
+};
+
+const STUDY_TEMPLATES = [
+    {
+        id: 'bundle_tyt_genel',
+        title: 'TYT Sayısal Kampı (Soru)',
+        desc: 'Soru bankası odaklı. Matematik, Fen, Türkçe ve Sosyal derslerini ayrı ayrı hedeflerine ekler.',
+        icon: '🧱',
+        color: 'from-blue-500 to-cyan-600',
+        totalUnit: 1650, unit: 'Sayfa', totalEstTime: 250,
+        isBundle: true, // PAKET
+        items: [
+            {
+                title: 'TYT Matematik',
+                totalUnit: 400, unit: 'Sayfa', totalEstTime: 80,
+                notes: `KONU TAKİBİ:\n- [ ] Temel Kavramlar\n- [ ] Sayı Basamakları\n- [ ] Bölme & EBOB-EKOK\n- [ ] Rasyonel & Ondalık\n- [ ] Denklem Çözme\n- [ ] Basit Eşitsizlik & Mutlak Değer\n- [ ] Üslü & Köklü\n- [ ] Çarpanlara Ayırma\n- [ ] Oran-Orantı\n- [ ] Problemler (Tümü)\n- [ ] Kümeler & Fonksiyonlar`
+            },
+            {
+                title: 'TYT-AYT Geometri',
+                totalUnit: 350, unit: 'Sayfa', totalEstTime: 60, // GÜNCELLENDİ
+                notes: `KONU TAKİBİ:\n- [ ] Doğruda & Üçgende Açı\n- [ ] Özel Üçgenler\n- [ ] Açıortay-Kenarortay-Benzerlik\n- [ ] Üçgende Alan\n- [ ] Çokgenler & Dörtgenler\n- [ ] Çember & Daire\n- [ ] Katı Cisimler\n- [ ] Analitik Geometri`
+            },
+            {
+                title: 'TYT Fizik',
+                totalUnit: 200, unit: 'Sayfa', totalEstTime: 40, // GÜNCELLENDİ
+                notes: `KONU TAKİBİ:\n- [ ] Fizik Bilimine Giriş\n- [ ] Madde ve Özellikleri\n- [ ] Hareket ve Kuvvet\n- [ ] İş, Güç, Enerji\n- [ ] Isı ve Sıcaklık\n- [ ] Elektrostatik\n- [ ] Optik (Aydınlanma, Gölge, Ayna, Mercek)`
+            },
+            {
+                title: 'TYT Kimya',
+                totalUnit: 200, unit: 'Sayfa', totalEstTime: 35, // GÜNCELLENDİ
+                notes: `KONU TAKİBİ:\n- [ ] Kimya Bilimi\n- [ ] Atom ve Yapısı\n- [ ] Periyodik Sistem\n- [ ] Türler Arası Etkileşimler\n- [ ] Maddenin Halleri\n- [ ] Doğa ve Kimya\n- [ ] Kimya Kanunları\n- [ ] Asit-Baz-Tuz\n- [ ] Karışımlar`
+            },
+            {
+                title: 'TYT Biyoloji',
+                totalUnit: 200, unit: 'Sayfa', totalEstTime: 30, // GÜNCELLENDİ
+                notes: `KONU TAKİBİ:\n- [ ] Canlıların Ortak Özellikleri\n- [ ] Temel Bileşenler\n- [ ] Hücre ve Organelleri\n- [ ] Canlıların Sınıflandırılması\n- [ ] Üreme Çeşitleri\n- [ ] Kalıtım\n- [ ] Ekoloji`
+            },
+            {
+                title: 'TYT Türkçe',
+                totalUnit: 250, unit: 'Sayfa', totalEstTime: 40,
+                notes: `KONU TAKİBİ:\n- [ ] Sözcükte & Cümlede Anlam\n- [ ] Paragraf Teknikleri\n- [ ] Ses Bilgisi\n- [ ] Yazım Kuralları\n- [ ] Noktalama İşaretleri\n- [ ] Sözcük Türleri\n- [ ] Cümlenin Ögeleri`
+            },
+            {
+                title: 'TYT Sosyal (Tarih-Coğ-Fel)',
+                totalUnit: 350, unit: 'Sayfa', totalEstTime: 30, // YENİ EKLENDİ
+                notes: `KONU TAKİBİ:\n- [ ] TARİH: İlk Türk Devletleri\n- [ ] TARİH: Osmanlı Devleti\n- [ ] TARİH: İnkılap Tarihi\n- [ ] COĞ: Doğa ve İnsan & Harita\n- [ ] COĞ: İklim Bilgisi\n- [ ] COĞ: Nüfus ve Yerleşme\n- [ ] FEL: Bilgi, Varlık, Ahlak Felsefesi\n- [ ] DİN: Kavramlar`
+            }
+        ]
+    },
+    {
+        id: 'bundle_tyt_genel_konu',
+        title: 'TYT Sayısal Kampı (Konu)',
+        desc: 'Konu anlatım odaklı. Her 5 sayfa soru = 1 kısım konu çalışması.',
+        icon: '🧱',
+        color: 'from-blue-400 to-cyan-500',
+        totalUnit: 330, unit: 'Kısım', totalEstTime: 125,
+        isBundle: true,
+        items: [
+            {
+                title: 'TYT Matematik (Konu)',
+                totalUnit: 80, unit: 'Kısım', totalEstTime: 40,
+                notes: `KONU TAKİBİ:\n- [ ] Temel Kavramlar\n- [ ] Sayı Basamakları\n- [ ] Bölme & EBOB-EKOK\n- [ ] Rasyonel & Ondalık\n- [ ] Denklem Çözme\n- [ ] Basit Eşitsizlik & Mutlak Değer\n- [ ] Üslü & Köklü\n- [ ] Çarpanlara Ayırma\n- [ ] Oran-Orantı\n- [ ] Problemler (Tümü)\n- [ ] Kümeler & Fonksiyonlar`
+            },
+            {
+                title: 'TYT-AYT Geometri (Konu)',
+                totalUnit: 70, unit: 'Kısım', totalEstTime: 30,
+                notes: `KONU TAKİBİ:\n- [ ] Doğruda & Üçgende Açı\n- [ ] Özel Üçgenler\n- [ ] Açıortay-Kenarortay-Benzerlik\n- [ ] Üçgende Alan\n- [ ] Çokgenler & Dörtgenler\n- [ ] Çember & Daire\n- [ ] Katı Cisimler\n- [ ] Analitik Geometri`
+            },
+            {
+                title: 'TYT Fizik (Konu)',
+                totalUnit: 40, unit: 'Kısım', totalEstTime: 20,
+                notes: `KONU TAKİBİ:\n- [ ] Fizik Bilimine Giriş\n- [ ] Madde ve Özellikleri\n- [ ] Hareket ve Kuvvet\n- [ ] İş, Güç, Enerji\n- [ ] Isı ve Sıcaklık\n- [ ] Elektrostatik\n- [ ] Optik (Aydınlanma, Gölge, Ayna, Mercek)`
+            },
+            {
+                title: 'TYT Kimya (Konu)',
+                totalUnit: 40, unit: 'Kısım', totalEstTime: 17.5,
+                notes: `KONU TAKİBİ:\n- [ ] Kimya Bilimi\n- [ ] Atom ve Yapısı\n- [ ] Periyodik Sistem\n- [ ] Türler Arası Etkileşimler\n- [ ] Maddenin Halleri\n- [ ] Doğa ve Kimya\n- [ ] Kimya Kanunları\n- [ ] Asit-Baz-Tuz\n- [ ] Karışımlar`
+            },
+            {
+                title: 'TYT Biyoloji (Konu)',
+                totalUnit: 40, unit: 'Kısım', totalEstTime: 15,
+                notes: `KONU TAKİBİ:\n- [ ] Canlıların Ortak Özellikleri\n- [ ] Temel Bileşenler\n- [ ] Hücre ve Organelleri\n- [ ] Canlıların Sınıflandırılması\n- [ ] Üreme Çeşitleri\n- [ ] Kalıtım\n- [ ] Ekoloji`
+            },
+            {
+                title: 'TYT Türkçe (Konu)',
+                totalUnit: 50, unit: 'Kısım', totalEstTime: 20,
+                notes: `KONU TAKİBİ:\n- [ ] Sözcükte & Cümlede Anlam\n- [ ] Paragraf Teknikleri\n- [ ] Ses Bilgisi\n- [ ] Yazım Kuralları\n- [ ] Noktalama İşaretleri\n- [ ] Sözcük Türleri\n- [ ] Cümlenin Ögeleri`
+            },
+            {
+                title: 'TYT Sosyal (Konu)',
+                totalUnit: 70, unit: 'Kısım', totalEstTime: 15,
+                notes: `KONU TAKİBİ:\n- [ ] TARİH: İlk Türk Devletleri\n- [ ] TARİH: Osmanlı Devleti\n- [ ] TARİH: İnkılap Tarihi\n- [ ] COĞ: Doğa ve İnsan & Harita\n- [ ] COĞ: İklim Bilgisi\n- [ ] COĞ: Nüfus ve Yerleşme\n- [ ] FEL: Bilgi, Varlık, Ahlak Felsefesi\n- [ ] DİN: Kavramlar`
+            }
+        ]
+    },
+    {
+        id: 'bundle_ayt_sayisal',
+        title: 'AYT Sayısal Kampı (Soru)',
+        desc: 'Soru bankası odaklı. Matematik (LTİ dahil), Fizik, Kimya ve Biyoloji hedeflerini ayrı ayrı ekler.',
+        icon: '🔥',
+        color: 'from-rose-600 to-red-700',
+        totalUnit: 1350, unit: 'Sayfa', totalEstTime: 300,
+        isBundle: true, // PAKET
+        items: [
+            {
+                title: 'AYT Matematik',
+                totalUnit: 450, unit: 'Sayfa', totalEstTime: 100,
+                notes: `KONU TAKİBİ:\n- [ ] Polinomlar\n- [ ] 2. Dereceden Denklemler\n- [ ] Karmaşık Sayılar & Parabol\n- [ ] Eşitsizlikler\n- [ ] Logaritma & Diziler\n- [ ] Trigonometri\n- [ ] Limit ve Süreklilik\n- [ ] Türev (Alma, Teğet, Max-Min)\n- [ ] İntegral (Belirsiz, Belirli, Alan)`
+            },
+            {
+                title: 'AYT Fizik',
+                totalUnit: 300, unit: 'Sayfa', totalEstTime: 70, // GÜNCELLENDİ
+                notes: `KONU TAKİBİ:\n- [ ] Vektör & Kuvvet & Tork\n- [ ] Atışlar & İtme-Momentum\n- [ ] Elektrik Alan & Potansiyel\n- [ ] Manyetizma & İndüksiyon\n- [ ] Alternatif Akım & Transformatör\n- [ ] Çembersel Hareket\n- [ ] Basit Harmonik Hareket\n- [ ] Dalga Mekaniği\n- [ ] Modern Fizik`
+            },
+            {
+                title: 'AYT Kimya',
+                totalUnit: 300, unit: 'Sayfa', totalEstTime: 65, // GÜNCELLENDİ
+                notes: `KONU TAKİBİ:\n- [ ] Modern Atom Teorisi\n- [ ] Gazlar\n- [ ] Sıvı Çözeltiler\n- [ ] Kimyasal Enerji & Hız & Denge\n- [ ] Asit-Baz Dengesi\n- [ ] Kimya ve Elektrik\n- [ ] Organik Kimya (Tamamı)`
+            },
+            {
+                title: 'AYT Biyoloji',
+                totalUnit: 300, unit: 'Sayfa', totalEstTime: 60, // GÜNCELLENDİ
+                notes: `KONU TAKİBİ:\n- [ ] Sinir Sistemi & Duyu Organları\n- [ ] Endokrin Sistem\n- [ ] Destek ve Hareket\n- [ ] Sindirim & Dolaşım & Solunum\n- [ ] Boşaltım & Üreme\n- [ ] Protein Sentezi\n- [ ] Canlılık ve Enerji (Solunum/Foto)\n- [ ] Bitki Biyolojisi`
+            }
+        ]
+    },
+    {
+        id: 'bundle_ayt_sayisal_konu',
+        title: 'AYT Sayısal Kampı (Konu)',
+        desc: 'Konu anlatım odaklı. Her 5 sayfa soru = 1 kısım konu çalışması.',
+        icon: '🔥',
+        color: 'from-rose-500 to-red-600',
+        totalUnit: 270, unit: 'Kısım', totalEstTime: 147.5,
+        isBundle: true,
+        items: [
+            {
+                title: 'AYT Matematik (Konu)',
+                totalUnit: 90, unit: 'Kısım', totalEstTime: 50,
+                notes: `KONU TAKİBİ:\n- [ ] Polinomlar\n- [ ] 2. Dereceden Denklemler\n- [ ] Karmaşık Sayılar & Parabol\n- [ ] Eşitsizlikler\n- [ ] Logaritma & Diziler\n- [ ] Trigonometri\n- [ ] Limit ve Süreklilik\n- [ ] Türev (Alma, Teğet, Max-Min)\n- [ ] İntegral (Belirsiz, Belirli, Alan)`
+            },
+            {
+                title: 'AYT Fizik (Konu)',
+                totalUnit: 60, unit: 'Kısım', totalEstTime: 35,
+                notes: `KONU TAKİBİ:\n- [ ] Vektör & Kuvvet & Tork\n- [ ] Atışlar & İtme-Momentum\n- [ ] Elektrik Alan & Potansiyel\n- [ ] Manyetizma & İndüksiyon\n- [ ] Alternatif Akım & Transformatör\n- [ ] Çembersel Hareket\n- [ ] Basit Harmonik Hareket\n- [ ] Dalga Mekaniği\n- [ ] Modern Fizik`
+            },
+            {
+                title: 'AYT Kimya (Konu)',
+                totalUnit: 60, unit: 'Kısım', totalEstTime: 32.5,
+                notes: `KONU TAKİBİ:\n- [ ] Modern Atom Teorisi\n- [ ] Gazlar\n- [ ] Sıvı Çözeltiler\n- [ ] Kimyasal Enerji & Hız & Denge\n- [ ] Asit-Baz Dengesi\n- [ ] Kimya ve Elektrik\n- [ ] Organik Kimya (Tamamı)`
+            },
+            {
+                title: 'AYT Biyoloji (Konu)',
+                totalUnit: 60, unit: 'Kısım', totalEstTime: 30,
+                notes: `KONU TAKİBİ:\n- [ ] Sinir Sistemi & Duyu Organları\n- [ ] Endokrin Sistem\n- [ ] Destek ve Hareket\n- [ ] Sindirim & Dolaşım & Solunum\n- [ ] Boşaltım & Üreme\n- [ ] Protein Sentezi\n- [ ] Canlılık ve Enerji (Solunum/Foto)\n- [ ] Bitki Biyolojisi`
+            }
+        ]
+    },
+    {
+        id: 'bundle_tyt_ea',
+        title: 'TYT Eşit Ağırlık Kampı (Soru)',
+        desc: 'Soru bankası odaklı. Matematik, Türkçe, Sosyal ve Bonus Fen konuları.',
+        icon: '⚖️',
+        color: 'from-orange-500 to-amber-600',
+        totalUnit: 1550, unit: 'Sayfa', totalEstTime: 220,
+        isBundle: true,
+        items: [
+            {
+                title: 'TYT Matematik',
+                totalUnit: 350, unit: 'Sayfa', totalEstTime: 70,
+                notes: `KONU TAKİBİ:\n- [ ] Temel Kavramlar & Sayılar\n- [ ] Bölme, EBOB-EKOK\n- [ ] Rasyonel & Ondalık\n- [ ] Denklem Çözme\n- [ ] Basit Eşitsizlik & Mutlak Değer\n- [ ] Üslü & Köklü Sayılar\n- [ ] Çarpanlara Ayırma\n- [ ] Oran-Orantı\n- [ ] Problemler (Sayı, Kesir, Yaş)\n- [ ] Problemler (Hız, Yüzde, Kar-Zarar)\n- [ ] Kümeler & Fonksiyonlar`
+            },
+            {
+                title: 'TYT-AYT Geometri',
+                totalUnit: 300, unit: 'Sayfa', totalEstTime: 50,
+                notes: `KONU TAKİBİ:\n- [ ] Üçgenler (Açı, Alan, Benzerlik)\n- [ ] Çokgenler & Dörtgenler\n- [ ] Çember & Daire\n- [ ] Katı Cisimler\n- [ ] Analitik Geometri\n- [ ] Dönüşümler`
+            },
+            {
+                title: 'TYT Türkçe',
+                totalUnit: 250, unit: 'Sayfa', totalEstTime: 40,
+                notes: `KONU TAKİBİ:\n- [ ] Sözcükte & Cümlede Anlam\n- [ ] Paragraf (Her Gün)\n- [ ] Ses Bilgisi\n- [ ] Yazım & Noktalama\n- [ ] Sözcük Türleri (İsim, Sıfat, Fiil)\n- [ ] Cümlenin Ögeleri & Türleri\n- [ ] Anlatım Bozuklukları`
+            },
+            {
+                title: 'TYT Sosyal (Tarih-Coğ-Fel-Din)',
+                totalUnit: 300, unit: 'Sayfa', totalEstTime: 30,
+                notes: `KONU TAKİBİ:\n- [ ] TARİH: İlk Çağ & Türk Tarihi\n- [ ] TARİH: Osmanlı & İnkılap\n- [ ] COĞ: Doğa-İnsan & Harita\n- [ ] COĞ: İklim & Nüfus\n- [ ] FEL: Bilgi, Varlık, Ahlak, Din, Sanat\n- [ ] DİN: İnanç, İbadet, Hz. Muhammed`
+            },
+            {
+                title: 'TYT Fen (Fiz-Kim-Biyo)',
+                totalUnit: 350, unit: 'Sayfa', totalEstTime: 30,
+                notes: `BONUS NET İÇİN:\n- [ ] FİZ: Madde, Isı-Sıcaklık, Hareket\n- [ ] FİZ: Elektrik, Optik\n- [ ] KİM: Atom, Periyodik, Maddenin Halleri\n- [ ] KİM: Karışımlar, Asit-Baz\n- [ ] BİYO: Canlıların Ortak Öz., Hücre\n- [ ] BİYO: Sınıflandırma, Ekoloji`
+            }
+        ]
+    },
+    {
+        id: 'bundle_tyt_ea_konu',
+        title: 'TYT Eşit Ağırlık Kampı (Konu)',
+        desc: 'Konu anlatım odaklı. Her 5 sayfa soru = 1 kısım konu çalışması.',
+        icon: '⚖️',
+        color: 'from-orange-400 to-amber-500',
+        totalUnit: 310, unit: 'Kısım', totalEstTime: 110,
+        isBundle: true,
+        items: [
+            {
+                title: 'TYT Matematik (Konu)',
+                totalUnit: 70, unit: 'Kısım', totalEstTime: 35,
+                notes: `KONU TAKİBİ:\n- [ ] Temel Kavramlar & Sayılar\n- [ ] Bölme, EBOB-EKOK\n- [ ] Rasyonel & Ondalık\n- [ ] Denklem Çözme\n- [ ] Basit Eşitsizlik & Mutlak Değer\n- [ ] Üslü & Köklü Sayılar\n- [ ] Çarpanlara Ayırma\n- [ ] Oran-Orantı\n- [ ] Problemler (Sayı, Kesir, Yaş)\n- [ ] Problemler (Hız, Yüzde, Kar-Zarar)\n- [ ] Kümeler & Fonksiyonlar`
+            },
+            {
+                title: 'TYT-AYT Geometri (Konu)',
+                totalUnit: 60, unit: 'Kısım', totalEstTime: 25,
+                notes: `KONU TAKİBİ:\n- [ ] Üçgenler (Açı, Alan, Benzerlik)\n- [ ] Çokgenler & Dörtgenler\n- [ ] Çember & Daire\n- [ ] Katı Cisimler\n- [ ] Analitik Geometri\n- [ ] Dönüşümler`
+            },
+            {
+                title: 'TYT Türkçe (Konu)',
+                totalUnit: 50, unit: 'Kısım', totalEstTime: 20,
+                notes: `KONU TAKİBİ:\n- [ ] Sözcükte & Cümlede Anlam\n- [ ] Paragraf (Her Gün)\n- [ ] Ses Bilgisi\n- [ ] Yazım & Noktalama\n- [ ] Sözcük Türleri (İsim, Sıfat, Fiil)\n- [ ] Cümlenin Ögeleri & Türleri\n- [ ] Anlatım Bozuklukları`
+            },
+            {
+                title: 'TYT Sosyal (Konu)',
+                totalUnit: 60, unit: 'Kısım', totalEstTime: 15,
+                notes: `KONU TAKİBİ:\n- [ ] TARİH: İlk Çağ & Türk Tarihi\n- [ ] TARİH: Osmanlı & İnkılap\n- [ ] COĞ: Doğa-İnsan & Harita\n- [ ] COĞ: İklim & Nüfus\n- [ ] FEL: Bilgi, Varlık, Ahlak, Din, Sanat\n- [ ] DİN: İnanç, İbadet, Hz. Muhammed`
+            },
+            {
+                title: 'TYT Fen (Konu)',
+                totalUnit: 70, unit: 'Kısım', totalEstTime: 15,
+                notes: `BONUS NET İÇİN:\n- [ ] FİZ: Madde, Isı-Sıcaklık, Hareket\n- [ ] FİZ: Elektrik, Optik\n- [ ] KİM: Atom, Periyodik, Maddenin Halleri\n- [ ] KİM: Karışımlar, Asit-Baz\n- [ ] BİYO: Canlıların Ortak Öz., Hücre\n- [ ] BİYO: Sınıflandırma, Ekoloji`
+            }
+        ]
+    },
+    {
+        id: 'bundle_ayt_ea',
+        title: 'AYT Eşit Ağırlık Kampı (Soru)',
+        desc: 'Soru bankası odaklı. Edebiyat, Tarih, Coğrafya ve Matematik (LTİ).',
+        icon: '📚',
+        color: 'from-red-500 to-rose-600',
+        totalUnit: 1400, unit: 'Sayfa', totalEstTime: 250,
+        isBundle: true,
+        items: [
+            {
+                title: 'AYT Matematik',
+                totalUnit: 450, unit: 'Sayfa', totalEstTime: 100,
+                notes: `KONU TAKİBİ (7. AY LTİ):\n- [ ] Polinomlar & 2. Dereceden Denklemler\n- [ ] Karmaşık Sayılar & Parabol\n- [ ] Eşitsizlikler\n- [ ] Logaritma & Diziler\n- [ ] Permütasyon, Kombinasyon, Olasılık\n- [ ] Limit ve Süreklilik\n- [ ] Türev (Alma, Teğet, Max-Min)\n- [ ] İntegral (Belirsiz, Belirli, Alan)`
+            },
+            {
+                title: 'AYT Edebiyat',
+                totalUnit: 450, unit: 'Sayfa', totalEstTime: 80,
+                notes: `KONU TAKİBİ:\n- [ ] Güzel Sanatlar & Metin Türleri\n- [ ] Şiir Bilgisi & Edebi Sanatlar\n- [ ] İslamiyet Öncesi & Geçiş Dönemi\n- [ ] Halk Edebiyatı\n- [ ] Divan Edebiyatı (Şairler & Eserler)\n- [ ] Tanzimat & Servetifünun & Fecri Ati\n- [ ] Milli Edebiyat\n- [ ] Cumhuriyet Dönemi (Şiir, Roman, Hikaye)`
+            },
+            {
+                title: 'AYT Tarih-1',
+                totalUnit: 250, unit: 'Sayfa', totalEstTime: 40,
+                notes: `KONU TAKİBİ:\n- [ ] Tarih Bilimine Giriş & İlk Çağ\n- [ ] İslam Tarihi & Türk İslam\n- [ ] Osmanlı (Kuruluş-Yükselme-Duraklama)\n- [ ] Osmanlı (Gerileme-Dağılma)\n- [ ] En Uzun Yüzyıl & Diplomasi\n- [ ] Milli Mücadele & Atatürk Dönemi\n- [ ] Çağdaş Türk ve Dünya Tarihi`
+            },
+            {
+                title: 'AYT Coğrafya-1',
+                totalUnit: 250, unit: 'Sayfa', totalEstTime: 30,
+                notes: `KONU TAKİBİ:\n- [ ] Ekosistem & Madde Döngüleri\n- [ ] Nüfus Politikaları\n- [ ] Yerleşme & Şehirler\n- [ ] Türkiye'de Ekonomi (Tarım, Hayvancılık)\n- [ ] Türkiye'de Madenler & Enerji\n- [ ] Ulaşım, Ticaret, Turizm\n- [ ] Bölgeler & Ülkeler\n- [ ] Çevre ve Toplum`
+            }
+        ]
+    },
+    {
+        id: 'bundle_ayt_ea_konu',
+        title: 'AYT Eşit Ağırlık Kampı (Konu)',
+        desc: 'Konu anlatım odaklı. Her 5 sayfa soru = 1 kısım konu çalışması.',
+        icon: '📚',
+        color: 'from-red-400 to-rose-500',
+        totalUnit: 280, unit: 'Kısım', totalEstTime: 125,
+        isBundle: true,
+        items: [
+            {
+                title: 'AYT Matematik (Konu)',
+                totalUnit: 90, unit: 'Kısım', totalEstTime: 50,
+                notes: `KONU TAKİBİ:\n- [ ] Polinomlar & 2. Dereceden Denklemler\n- [ ] Karmaşık Sayılar & Parabol\n- [ ] Eşitsizlikler\n- [ ] Logaritma & Diziler\n- [ ] Permütasyon, Kombinasyon, Olasılık\n- [ ] Limit ve Süreklilik\n- [ ] Türev (Alma, Teğet, Max-Min)\n- [ ] İntegral (Belirsiz, Belirli, Alan)`
+            },
+            {
+                title: 'AYT Edebiyat (Konu)',
+                totalUnit: 90, unit: 'Kısım', totalEstTime: 40,
+                notes: `KONU TAKİBİ:\n- [ ] Güzel Sanatlar & Metin Türleri\n- [ ] Şiir Bilgisi & Edebi Sanatlar\n- [ ] İslamiyet Öncesi & Geçiş Dönemi\n- [ ] Halk Edebiyatı\n- [ ] Divan Edebiyatı (Şairler & Eserler)\n- [ ] Tanzimat & Servetifünun & Fecri Ati\n- [ ] Milli Edebiyat\n- [ ] Cumhuriyet Dönemi (Şiir, Roman, Hikaye)`
+            },
+            {
+                title: 'AYT Tarih-1 (Konu)',
+                totalUnit: 50, unit: 'Kısım', totalEstTime: 20,
+                notes: `KONU TAKİBİ:\n- [ ] Tarih Bilimine Giriş & İlk Çağ\n- [ ] İslam Tarihi & Türk İslam\n- [ ] Osmanlı (Kuruluş-Yükselme-Duraklama)\n- [ ] Osmanlı (Gerileme-Dağılma)\n- [ ] En Uzun Yüzyıl & Diplomasi\n- [ ] Milli Mücadele & Atatürk Dönemi\n- [ ] Çağdaş Türk ve Dünya Tarihi`
+            },
+            {
+                title: 'AYT Coğrafya-1 (Konu)',
+                totalUnit: 50, unit: 'Kısım', totalEstTime: 15,
+                notes: `KONU TAKİBİ:\n- [ ] Ekosistem & Madde Döngüleri\n- [ ] Nüfus Politikaları\n- [ ] Yerleşme & Şehirler\n- [ ] Türkiye'de Ekonomi (Tarım, Hayvancılık)\n- [ ] Türkiye'de Madenler & Enerji\n- [ ] Ulaşım, Ticaret, Turizm\n- [ ] Bölgeler & Ülkeler\n- [ ] Çevre ve Toplum`
+            }
+        ]
+    },
+    {
+        id: 'bundle_tyt_sozel',
+        title: 'TYT Sözel Kampı (Soru)',
+        desc: 'Soru bankası odaklı. Türkçe, Sosyal ve fark attıran Matematik/Fen.',
+        icon: '🗿',
+        color: 'from-orange-500 to-red-500',
+        totalUnit: 1300, unit: 'Sayfa', totalEstTime: 180,
+        isBundle: true,
+        items: [
+            {
+                title: 'TYT Türkçe (Dil Bilgisi)',
+                totalUnit: 250, unit: 'Sayfa', totalEstTime: 40,
+                notes: `KONU TAKİBİ:\n- [ ] Sözcükte & Cümlede Anlam\n- [ ] Paragraf Teknikleri\n- [ ] Ses Bilgisi\n- [ ] Yazım Kuralları\n- [ ] Noktalama İşaretleri\n- [ ] Sözcük Türleri (İsim, Sıfat, Zamir...)\n- [ ] Fiiller & Ek Fiil\n- [ ] Cümlenin Ögeleri\n- [ ] Cümle Çeşitleri\n- [ ] Anlatım Bozuklukları`
+            },
+            {
+                title: 'TYT Sosyal (Full Paket)',
+                totalUnit: 300, unit: 'Sayfa', totalEstTime: 50,
+                notes: `KONU TAKİBİ:\n- [ ] TARİH: İlk Çağ & İslamiyet Öncesi\n- [ ] TARİH: Türk İslam & Osmanlı\n- [ ] TARİH: İnkılap Tarihi\n- [ ] COĞ: Doğa-İnsan, Harita, İklim\n- [ ] COĞ: Nüfus, Yerleşme, Afetler\n- [ ] FEL: Bilgi, Varlık, Ahlak, Din, Siyaset\n- [ ] DİN: İnanç, İbadet, Hz. Muhammed`
+            },
+            {
+                title: 'TYT Matematik (Temel)',
+                totalUnit: 300, unit: 'Sayfa', totalEstTime: 40,
+                notes: `SÖZELCİ İÇİN MATEMATİK:\n- [ ] Temel Kavramlar & Sayılar\n- [ ] Bölme & EBOB-EKOK\n- [ ] Rasyonel Sayılar\n- [ ] Denklem Çözme\n- [ ] Basit Eşitsizlik & Mutlak Değer\n- [ ] Üslü & Köklü Sayılar\n- [ ] Problemler (Yapabildiğin Kadar)`
+            },
+            {
+                title: 'TYT Fen (Fiz-Kim-Biyo)',
+                totalUnit: 250, unit: 'Sayfa', totalEstTime: 30,
+                notes: `FARK ATTIRAN FEN:\n- [ ] FİZ: Madde, Isı-Sıcaklık, Hareket\n- [ ] KİM: Atom, Periyodik, Maddenin Halleri\n- [ ] BİYO: Canlıların Ortak Öz., Hücre\n- [ ] BİYO: Sınıflandırma, Ekoloji`
+            }
+        ]
+    },
+    {
+        id: 'bundle_tyt_sozel_konu',
+        title: 'TYT Sözel Kampı (Konu)',
+        desc: 'Konu anlatım odaklı. Her 5 sayfa soru = 1 kısım konu çalışması.',
+        icon: '🗿',
+        color: 'from-orange-400 to-red-400',
+        totalUnit: 220, unit: 'Kısım', totalEstTime: 80,
+        isBundle: true,
+        items: [
+            {
+                title: 'TYT Türkçe - Dil Bilgisi (Konu)',
+                totalUnit: 50, unit: 'Kısım', totalEstTime: 20,
+                notes: `KONU TAKİBİ:\n- [ ] Sözcükte & Cümlede Anlam\n- [ ] Paragraf Teknikleri\n- [ ] Ses Bilgisi\n- [ ] Yazım Kuralları\n- [ ] Noktalama İşaretleri\n- [ ] Sözcük Türleri (İsim, Sıfat, Zamir...)\n- [ ] Fiiller & Ek Fiil\n- [ ] Cümlenin Ögeleri\n- [ ] Cümle Çeşitleri\n- [ ] Anlatım Bozuklukları`
+            },
+            {
+                title: 'TYT Sosyal - Full Paket (Konu)',
+                totalUnit: 60, unit: 'Kısım', totalEstTime: 25,
+                notes: `KONU TAKİBİ:\n- [ ] TARİH: İlk Çağ & İslamiyet Öncesi\n- [ ] TARİH: Türk İslam & Osmanlı\n- [ ] TARİH: İnkılap Tarihi\n- [ ] COĞ: Doğa-İnsan, Harita, İklim\n- [ ] COĞ: Nüfus, Yerleşme, Afetler\n- [ ] FEL: Bilgi, Varlık, Ahlak, Din, Siyaset\n- [ ] DİN: İnanç, İbadet, Hz. Muhammed`
+            },
+            {
+                title: 'TYT Matematik - Temel (Konu)',
+                totalUnit: 60, unit: 'Kısım', totalEstTime: 20,
+                notes: `SÖZELCİ İÇİN MATEMATİK:\n- [ ] Temel Kavramlar & Sayılar\n- [ ] Bölme & EBOB-EKOK\n- [ ] Rasyonel Sayılar\n- [ ] Denklem Çözme\n- [ ] Basit Eşitsizlik & Mutlak Değer\n- [ ] Üslü & Köklü Sayılar\n- [ ] Problemler (Yapabildiğin Kadar)`
+            },
+            {
+                title: 'TYT Fen (Konu)',
+                totalUnit: 50, unit: 'Kısım', totalEstTime: 15,
+                notes: `FARK ATTIRAN FEN:\n- [ ] FİZ: Madde, Isı-Sıcaklık, Hareket\n- [ ] KİM: Atom, Periyodik, Maddenin Halleri\n- [ ] BİYO: Canlıların Ortak Öz., Hücre\n- [ ] BİYO: Sınıflandırma, Ekoloji`
+            }
+        ]
+    },
+    {
+        id: 'bundle_ayt_sozel',
+        title: 'AYT Sözel Kampı (Soru)',
+        desc: 'Soru bankası odaklı. Edebiyat, Tarih, Coğrafya ve Felsefe Grubu.',
+        icon: '📜',
+        color: 'from-amber-600 to-yellow-700',
+        totalUnit: 1500, unit: 'Sayfa', totalEstTime: 250,
+        isBundle: true,
+        items: [
+            {
+                title: 'AYT Edebiyat',
+                totalUnit: 500, unit: 'Sayfa', totalEstTime: 90,
+                notes: `KONU TAKİBİ:\n- [ ] Güzel Sanatlar & Edebi Sanatlar\n- [ ] Şiir Bilgisi & Nazım Biçimleri\n- [ ] İslamiyet Öncesi & Geçiş Dönemi\n- [ ] Halk Edebiyatı\n- [ ] Divan Edebiyatı (Şairler & Eserler)\n- [ ] Tanzimat Edebiyatı\n- [ ] Servetifünun & Fecri Ati\n- [ ] Milli Edebiyat\n- [ ] Cumhuriyet Dönemi (Şiir, Roman, Tiyatro)`
+            },
+            {
+                title: 'AYT Tarih-2',
+                totalUnit: 350, unit: 'Sayfa', totalEstTime: 60,
+                notes: `DETAYLI TARİH:\n- [ ] Tarih Bilimine Giriş & İlk Çağ\n- [ ] İslam Tarihi & Türk İslam Devletleri\n- [ ] Osmanlı (Kuruluş-Yükselme-Kültür Med.)\n- [ ] Osmanlı (Duraklama-Gerileme-Dağılma)\n- [ ] I. Dünya Savaşı & Milli Mücadele\n- [ ] Atatürk Dönemi İç/Dış Politika\n- [ ] Çağdaş Türk ve Dünya Tarihi`
+            },
+            {
+                title: 'AYT Coğrafya-2',
+                totalUnit: 300, unit: 'Sayfa', totalEstTime: 50,
+                notes: `KONU TAKİBİ:\n- [ ] Ekosistem & Madde Döngüleri\n- [ ] Nüfus Politikaları & Şehirler\n- [ ] Türkiye Ekonomisi (Tarım, Sanayi, Maden)\n- [ ] Ulaşım, Ticaret, Turizm\n- [ ] Bölgeler ve Ülkeler (Küresel Ortam)\n- [ ] Çevre ve Toplum (Kirlilik, Geri Dönüşüm)`
+            },
+            {
+                title: 'AYT Felsefe Grubu (Psiko-Sosyo-Mantık)',
+                totalUnit: 350, unit: 'Sayfa', totalEstTime: 50,
+                notes: `SOSYAL-2'NİN KİLİDİ:\n- [ ] PSİKOLOJİ: Bilim Olarak Psikoloji, Öğrenme, Bellek\n- [ ] PSİKOLOJİ: Ruh Sağlığı, Sosyal Davranış\n- [ ] SOSYOLOJİ: Toplum, Kültür, Kurumlar\n- [ ] SOSYOLOJİ: Değişme ve Gelişme\n- [ ] MANTIK: Klasik Mantık (Kavram, Önerme)\n- [ ] MANTIK: Sembolik Mantık`
+            }
+        ]
+    },
+    {
+        id: 'bundle_ayt_sozel_konu',
+        title: 'AYT Sözel Kampı (Konu)',
+        desc: 'Konu anlatım odaklı. Her 5 sayfa soru = 1 kısım konu çalışması.',
+        icon: '📜',
+        color: 'from-amber-500 to-yellow-600',
+        totalUnit: 300, unit: 'Kısım', totalEstTime: 125,
+        isBundle: true,
+        items: [
+            {
+                title: 'AYT Edebiyat (Konu)',
+                totalUnit: 100, unit: 'Kısım', totalEstTime: 45,
+                notes: `KONU TAKİBİ:\n- [ ] Güzel Sanatlar & Edebi Sanatlar\n- [ ] Şiir Bilgisi & Nazım Biçimleri\n- [ ] İslamiyet Öncesi & Geçiş Dönemi\n- [ ] Halk Edebiyatı\n- [ ] Divan Edebiyatı (Şairler & Eserler)\n- [ ] Tanzimat Edebiyatı\n- [ ] Servetifünun & Fecri Ati\n- [ ] Milli Edebiyat\n- [ ] Cumhuriyet Dönemi (Şiir, Roman, Tiyatro)`
+            },
+            {
+                title: 'AYT Tarih-2 (Konu)',
+                totalUnit: 70, unit: 'Kısım', totalEstTime: 30,
+                notes: `DETAYLI TARİH:\n- [ ] Tarih Bilimine Giriş & İlk Çağ\n- [ ] İslam Tarihi & Türk İslam Devletleri\n- [ ] Osmanlı (Kuruluş-Yükselme-Kültür Med.)\n- [ ] Osmanlı (Duraklama-Gerileme-Dağılma)\n- [ ] I. Dünya Savaşı & Milli Mücadele\n- [ ] Atatürk Dönemi İç/Dış Politika\n- [ ] Çağdaş Türk ve Dünya Tarihi`
+            },
+            {
+                title: 'AYT Coğrafya-2 (Konu)',
+                totalUnit: 60, unit: 'Kısım', totalEstTime: 25,
+                notes: `KONU TAKİBİ:\n- [ ] Ekosistem & Madde Döngüleri\n- [ ] Nüfus Politikaları & Şehirler\n- [ ] Türkiye Ekonomisi (Tarım, Sanayi, Maden)\n- [ ] Ulaşım, Ticaret, Turizm\n- [ ] Bölgeler ve Ülkeler (Küresel Ortam)\n- [ ] Çevre ve Toplum (Kirlilik, Geri Dönüşüm)`
+            },
+            {
+                title: 'AYT Felsefe Grubu (Konu)',
+                totalUnit: 70, unit: 'Kısım', totalEstTime: 25,
+                notes: `SOSYAL-2'NİN KİLİDİ:\n- [ ] PSİKOLOJİ: Bilim Olarak Psikoloji, Öğrenme, Bellek\n- [ ] PSİKOLOJİ: Ruh Sağlığı, Sosyal Davranış\n- [ ] SOSYOLOJİ: Toplum, Kültür, Kurumlar\n- [ ] SOSYOLOJİ: Değişme ve Gelişme\n- [ ] MANTIK: Klasik Mantık (Kavram, Önerme)\n- [ ] MANTIK: Sembolik Mantık`
+            }
+        ]
+    },
+    {
+        id: 't_paragraf_rutin',
+        title: 'Günlük Paragraf Rutini',
+        desc: 'Her gün min. 20 soru. Sınav refleksini canlı tut.',
+        totalUnit: 300,
+        unit: 'Sayfa',
+        totalEstTime: 40,
+        icon: '📚',
+        color: 'from-orange-400 to-amber-500',
+        isBundle: false, // TEKİL
+        defaultNotes: `HER GÜN ÇÖZÜLECEK:\n- [ ] Paragrafta Ana Düşünce\n- [ ] Paragrafta Yardımcı Düşünce\n- [ ] Paragrafta Yapı\n- [ ] Anlatım Teknikleri`
+    },
+    {
+        id: 'bundle_9sinif_soru',
+        title: '9. Sinif Basari Kampi (Soru)',
+        desc: '9. Sinif MEB mufredati soru bankasi hedefleri.',
+        icon: '🟦',
+        color: 'from-blue-500 to-blue-700',
+        totalUnit: 1290, unit: 'Sayfa', totalEstTime: 215,
+        isBundle: true,
+        items: [
+            { title: 'Matematik Soru', totalUnit: 300, unit: 'Sayfa', totalEstTime: 50 },
+            { title: 'Fizik Soru', totalUnit: 180, unit: 'Sayfa', totalEstTime: 30 },
+            { title: 'Kimya Soru', totalUnit: 180, unit: 'Sayfa', totalEstTime: 30 },
+            { title: 'Biyoloji Soru', totalUnit: 180, unit: 'Sayfa', totalEstTime: 30 },
+            { title: 'Turkce Soru', totalUnit: 150, unit: 'Sayfa', totalEstTime: 25 },
+            { title: 'Tarih Soru', totalUnit: 150, unit: 'Sayfa', totalEstTime: 25 },
+            { title: 'Cografya Soru', totalUnit: 150, unit: 'Sayfa', totalEstTime: 25 }
+        ]
+    },
+    {
+        id: 'bundle_9sinif_konu',
+        title: '9. Sinif Basari Kampi (Konu)',
+        desc: '9. Sinif MEB mufredati konu anlatim hedefleri.',
+        icon: '🟧',
+        color: 'from-orange-400 to-orange-600',
+        totalUnit: 258, unit: 'Kisim', totalEstTime: 109,
+        isBundle: true,
+        items: [
+            { title: 'Matematik Konu', totalUnit: 60, unit: 'Kisim', totalEstTime: 25 },
+            { title: 'Fizik Konu', totalUnit: 36, unit: 'Kisim', totalEstTime: 15 },
+            { title: 'Kimya Konu', totalUnit: 36, unit: 'Kisim', totalEstTime: 15 },
+            { title: 'Biyoloji Konu', totalUnit: 36, unit: 'Kisim', totalEstTime: 15 },
+            { title: 'Turkce Konu', totalUnit: 30, unit: 'Kisim', totalEstTime: 13 },
+            { title: 'Tarih Konu', totalUnit: 30, unit: 'Kisim', totalEstTime: 13 },
+            { title: 'Cografya Konu', totalUnit: 30, unit: 'Kisim', totalEstTime: 13 }
+        ]
+    },
+    {
+        id: 't_9sinif_kitap',
+        title: 'Kitap Kurdu (min 5+ sayfa)',
+        desc: 'Duzenli kitap okuma aliskanligi (Gunde 5+ Sayfa)',
+        totalUnit: 1000,
+        unit: 'Sayfa',
+        totalEstTime: 25,
+        icon: '📚',
+        color: 'from-purple-500 to-violet-600',
+        isBundle: false,
+        defaultNotes: `OKUMA HEDEFİ:
+- [ ] Her gun en az 5 sayfa
+- [ ] Haftada 1 bolum bitir
+- [ ] Okuduklarini not al`
+    },
+    {
+        id: 't_aylik_tekrar',
+        title: 'Aylik Okul Tekrari',
+        desc: 'O gun okulda islenenlerin 30 dakikalik tekrari.',
+        totalUnit: 30,
+        unit: 'Gun',
+        totalEstTime: 15,
+        icon: '🎒',
+        color: 'from-green-500 to-emerald-600',
+        isBundle: false,
+        defaultNotes: `GUNLUK TEKRAR:
+- [ ] Bugun islenen konulari gozden gecir
+- [ ] Anlamadigin yerleri isaretle
+- [ ] Kisa ozet cikar`
+    },
+    {
+        id: 'universal_subject_mastery',
+        title: '📚 Evrensel Ders Kampı (4 Ayaklı Sistem)',
+        desc: 'Herhangi bir dersi sıfırdan bitirmek için ana şablon. Kendi dersinize ve kaynaklarınıza göre sayıları düzenleyin.',
+        icon: '🧠',
+        color: 'from-blue-500 to-indigo-600',
+        totalUnit: 0, unit: 'br', totalEstTime: 108,
+        isBundle: true,
+        items: [
+            {
+                title: '📺 Video Takibi (Örn: 90 Video)',
+                totalUnit: 90, unit: 'Video', totalEstTime: 30,
+                notes: `VIDEO TAKİBİ:\n- [ ] Konu listesini belirle\n- [ ] Videoları izle ve not al\n- [ ] Anlamadığın yerleri işaretle\n- [ ] Her 10 videodan sonra mini tekrar yap`
+            },
+            {
+                title: '📖 Konu Çalışması (Örn: 15 Konu / 45 Mikro Konu)',
+                totalUnit: 45, unit: 'Konu', totalEstTime: 25,
+                notes: `KONU TAKİBİ:\n- [ ] Ana konuları listele\n- [ ] Her konuyu mikro parçalara böl\n- [ ] Özet çıkar\n- [ ] Formül/kural kartları hazırla`
+            },
+            {
+                title: '🎯 Soru Bankası Eritme (Örn: 300 Sayfa)',
+                totalUnit: 300, unit: 'Sayfa', totalEstTime: 45,
+                notes: `SORU TAKİBİ:\n- [ ] Kolay → Orta → Zor sırasıyla ilerle\n- [ ] Yanlışları ayrı deftere yaz\n- [ ] Her 50 sayfada yanlış analizi yap\n- [ ] Zayıf konulara geri dön`
+            },
+            {
+                title: '🔁 Genel Tekrar ve Analiz (Örn: 15 Konu)',
+                totalUnit: 15, unit: 'Konu', totalEstTime: 8,
+                notes: `TEKRAR TAKİBİ:\n- [ ] Tüm konuları tekrarla\n- [ ] Yanlış defterini gözden geçir\n- [ ] Deneme sınavı çöz\n- [ ] Zayıf noktaları tespit et ve tekrar çalış`
+            }
+        ]
+    }
+];
+
+const getTemplate = (id) => STUDY_TEMPLATES.find(t => t.id === id);
+
+const PRESET_CATEGORIES = [
+    {
+        title: 'YKS (Üniversite Hazırlık)',
+        icon: '🎓',
+        subcategories: [
+            {
+                title: 'Sayısal Kampı',
+                items: [
+                    getTemplate('bundle_tyt_genel'),
+                    getTemplate('bundle_tyt_genel_konu'),
+                    getTemplate('bundle_ayt_sayisal'),
+                    getTemplate('bundle_ayt_sayisal_konu'),
+                    getTemplate('t_paragraf_rutin')
+                ].filter(Boolean)
+            },
+            {
+                title: 'Eşit Ağırlık Kampı',
+                items: [
+                    getTemplate('bundle_tyt_ea'),
+                    getTemplate('bundle_tyt_ea_konu'),
+                    getTemplate('bundle_ayt_ea'),
+                    getTemplate('bundle_ayt_ea_konu'),
+                    getTemplate('t_paragraf_rutin')
+                ].filter(Boolean)
+            },
+            {
+                title: 'Sözel Kampı',
+                items: [
+                    getTemplate('bundle_tyt_sozel'),
+                    getTemplate('bundle_tyt_sozel_konu'),
+                    getTemplate('bundle_ayt_sozel'),
+                    getTemplate('bundle_ayt_sozel_konu'),
+                    getTemplate('t_paragraf_rutin')
+                ].filter(Boolean)
+            }
+        ]
+    },
+    {
+        title: 'Lise Ara Sınıflar',
+        icon: '🎒',
+        subcategories: [
+            {
+                title: '9. Sınıf',
+                items: [
+                    getTemplate('bundle_9sinif_soru'),
+                    getTemplate('bundle_9sinif_konu')
+                ].filter(Boolean)
+            },
+            {
+                title: '10. Sınıf',
+                items: []
+            },
+            {
+                title: '11. Sınıf',
+                items: []
+            }
+        ]
+    },
+    {
+        title: 'Genel Gelişim & Okul',
+        icon: '🌱',
+        items: [
+            getTemplate('t_9sinif_kitap'),
+            getTemplate('t_aylik_tekrar')
+        ].filter(Boolean)
+    },
+    {
+        title: '🧩 Evrensel Şablonlar',
+        icon: '🧠',
+        items: [
+            getTemplate('universal_subject_mastery')
+        ].filter(Boolean)
+    }
+];
+
+const StudentUI = ({
+    user, profile, activeTab, setActiveTab, selectedDate, setSelectedDate,
+    projects, history, habits, rewards, gold, flippedCards, setFlippedCards,
+    flippedProjects, setFlippedProjects,
+    focusMode, setFocusMode, modal, openModal, closeModal, form, setForm,
+    notificationModal, closeNotification,
+    handleAddProject, handleEditProject, handleDeleteProject,
+    handleAddTask, toggleTask, toggleSubItem, deleteTask,
+    addHabit, deleteHabit, toggleHabit,
+    handlePurchase, handleStartFocus, handleStopFocus,
+    handleAddReward, handleDeleteReward,
+    dateKey, todayKey, currentDayData, updateCloud, streakFreeze
+}) => {
+    const localFlippedProjects = flippedProjects || {};
+    const [calendarMode, setCalendarMode] = React.useState('day');
+    const [profileView, setProfileView] = React.useState('analytics'); // 'analytics' | 'routines'
+    const [dataAccordionOpen, setDataAccordionOpen] = React.useState(false);
+    const [showTimeline, setShowTimeline] = React.useState(false);
+
+    const [isDarkMode, setIsDarkMode] = React.useState(false);
+
+    React.useEffect(() => {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            setIsDarkMode(true);
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    }, []);
+
+    const toggleDarkMode = () => {
+        setIsDarkMode(prev => {
+            const newMode = !prev;
+            if (newMode) {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+            }
+            return newMode;
+        });
+    };
+
+    const studentData = {
+        id: user.uid,
+        projects: projects || [],
+        history: history || {}
+    };
+
+    // --- 2. GÜNCELLENMİŞ İÇERİ ALMA FONKSİYONU ---
+    const handleImportTemplate = (template) => {
+        let newProjectsToAdd = [];
+
+        // Eğer bu bir PAKET (Bundle) ise içindeki her bir dersi ayrı proje yap
+        if (template.isBundle && template.items) {
+            newProjectsToAdd = template.items.map((item, index) => ({
+                id: Date.now() + index, // Benzersiz ID için index ekle
+                title: item.title,
+                totalUnit: item.totalUnit,
+                currentUnit: 0,
+                unit: item.unit,
+                totalEstTime: item.totalEstTime,
+                notes: item.notes || '',
+                icon: template.icon, // Paketin ikonunu kullan veya item.icon varsa onu (kodda item.icon yok, template.icon mantıklı)
+                color: template.color // Paketin rengini kullan
+            }));
+        }
+        // Eğer TEKİL bir proje ise (Örn: Paragraf)
+        else {
+            newProjectsToAdd = [{
+                id: Date.now(),
+                title: template.title,
+                totalUnit: template.totalUnit,
+                currentUnit: 0,
+                unit: template.unit,
+                totalEstTime: template.totalEstTime,
+                notes: template.defaultNotes || template.desc,
+                icon: template.icon,
+                color: template.color
+            }];
+        }
+
+        const updatedProjects = [...projects, ...newProjectsToAdd];
+        updateCloud('projects', updatedProjects);
+        closeModal();
+    };
+
+    React.useEffect(() => {
+        if (activeTab === 'planner') setActiveTab('calendar');
+    }, []);
+
+    const getDayName = (dateStr) => {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' });
+    };
+
+    let completedCount = 0;
+    let totalCount = 0;
+
+    (currentDayData.tasks || []).forEach(t => {
+        if (t.type === 'project_slice' && t.subItems) {
+            totalCount += t.subItems.length;
+            completedCount += t.subItems.filter(Boolean).length;
+        } else {
+            totalCount += 1;
+            if (t.completed) completedCount += 1;
+        }
+    });
+
+    const completionRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+    const dayStatus = getStatusInfo(completionRate, totalCount > 0);
+
+    const [currentMonth, setCurrentMonth] = React.useState(new Date());
+    const getDaysInMonth = (date) => {
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const days = new Date(year, month + 1, 0).getDate();
+        const firstDay = new Date(year, month, 1).getDay();
+        const firstDayAdjusted = firstDay === 0 ? 6 : firstDay - 1;
+        return { days, firstDay: firstDayAdjusted };
+    };
+    const { days: daysInMonth, firstDay: firstDayOfMonth } = getDaysInMonth(currentMonth);
+
+    // Streak hesaplama
+    const calculateStreak = (hist) => {
+        const gdk = (d) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${dd}`;
+        };
+        const isDayQualified = (dayData) => {
+            if (!dayData) return false;
+            if (dayData.frozen === true) return true;
+            const tasks = dayData.tasks || [];
+            const hasTask = tasks.some(t => t.completed || (t.subItems && t.subItems.some(Boolean)));
+            const hasHabit = (dayData.habits || []).length > 0;
+            return hasTask && hasHabit;
+        };
+        let streak = 0;
+        const today = new Date();
+        const todayData = hist[gdk(today)];
+        let startFromToday = isDayQualified(todayData);
+        if (startFromToday) streak = 1;
+        const cursor = new Date(today);
+        cursor.setDate(cursor.getDate() - 1);
+        for (let i = 0; i < 365; i++) {
+            const key = gdk(cursor);
+            if (isDayQualified(hist[key])) {
+                streak++;
+            } else {
+                if (!startFromToday && i === 0) {
+                    cursor.setDate(cursor.getDate() - 1);
+                    continue;
+                }
+                break;
+            }
+            cursor.setDate(cursor.getDate() - 1);
+        }
+        return streak;
+    };
+    const streak = calculateStreak(history);
+
+    // Haftalık odak ve rütbe hesaplama
+    const calculateWeeklyFocus = (hist) => {
+        const gdk = (d) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${dd}`;
+        };
+        let totalMin = 0;
+        for (let i = 0; i < 7; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dayData = hist[gdk(d)];
+            if (!dayData || !dayData.tasks) continue;
+            totalMin += dayData.tasks.reduce((acc, t) => {
+                if (t.completed) return acc + (Number(t.duration) || 0);
+                if (t.subItems && t.subItems.length > 0) {
+                    const doneCount = t.subItems.filter(Boolean).length;
+                    return acc + ((Number(t.duration) || 0) * (doneCount / t.subItems.length));
+                }
+                return acc;
+            }, 0);
+        }
+        return Math.round(totalMin);
+    };
+    const weeklyFocusMin = calculateWeeklyFocus(history);
+    const weeklyHours = weeklyFocusMin / 60;
+
+    const calculateCurrentWeekFocus = (historyObj) => {
+        const now = new Date();
+        const currentDay = now.getDay();
+        const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+        const monday = new Date(now);
+        monday.setDate(now.getDate() + diffToMonday);
+        monday.setHours(0, 0, 0, 0);
+
+        let totalRawMinutes = 0;
+
+        Object.keys(historyObj).forEach(dateStr => {
+            const dateObj = new Date(dateStr);
+            if (dateObj >= monday && dateObj <= now) {
+                const dayData = historyObj[dateStr];
+                if (dayData && dayData.tasks && Array.isArray(dayData.tasks)) {
+                    dayData.tasks.forEach(t => {
+                        if (t.completed) {
+                            totalRawMinutes += (Number(t.duration) || 0);
+                        }
+                        if (!t.completed && t.subItems && t.subItems.length > 0) {
+                            const doneCount = t.subItems.filter(Boolean).length;
+                            const progress = doneCount / t.subItems.length;
+                            totalRawMinutes += ((Number(t.duration) || 0) * progress);
+                        }
+                    });
+                }
+            }
+        });
+
+        const totalMinutes = Math.round(totalRawMinutes);
+        const hrs = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
+
+        return { totalHours: hrs, totalMinutes: mins, totalRawMinutes: totalMinutes, hoursFloat: totalRawMinutes / 60 };
+    };
+
+    const getWeeklyTier = (h) => {
+        if (h >= 26) return { emoji: '💎', title: 'Yenilmez Makine', color: 'text-fuchsia-600', bg: 'bg-fuchsia-100', border: 'border-fuchsia-500/30', canvasBg: ['#4c1d95', '#1e1b4b'] };
+        if (h >= 24) return { emoji: '🚀', title: 'Efsanevi Momentum', color: 'text-amber-600', bg: 'bg-amber-100', border: 'border-amber-500/30', canvasBg: ['#b45309', '#78350f'] };
+        if (h >= 21) return { emoji: '🛡️', title: 'Disiplin Ustası', color: 'text-blue-600', bg: 'bg-blue-100', border: 'border-blue-500/30', canvasBg: ['#1d4ed8', '#1e3a8a'] };
+        if (h >= 17) return { emoji: '⚔️', title: 'İstikrarlı Savaşçı', color: 'text-rose-600', bg: 'bg-rose-100', border: 'border-rose-500/30', canvasBg: ['#be123c', '#4c0519'] };
+        if (h >= 12) return { emoji: '🎯', title: 'Odak Avcısı', color: 'text-emerald-600', bg: 'bg-emerald-100', border: 'border-emerald-500/30', canvasBg: ['#047857', '#064e3b'] };
+        if (h >= 8) return { emoji: '🚶‍♂️', title: 'Isınma Turu', color: 'text-yellow-700', bg: 'bg-yellow-100', border: 'border-yellow-500/30', canvasBg: ['#b45309', '#451a03'] };
+        if (h >= 4) return { emoji: '🌱', title: 'Odak Çaylağı', color: 'text-lime-700', bg: 'bg-lime-100', border: 'border-lime-500/30', canvasBg: ['#4d7c0f', '#14532d'] };
+        return { emoji: '💤', title: 'Uyuyan Dev', color: 'text-slate-500', bg: 'bg-slate-100', border: 'border-slate-400/30', canvasBg: ['#334155', '#0f172a'] };
+    };
+
+    const getWeeklyMentorQuote = (h) => {
+        if (h >= 26) return "Sınırları aştın! Bu tempoyla aşamayacağın engel yok!";
+        if (h >= 24) return "Makine gibi bir odaklanma! Sen artık bir öğrenci değil, gerçek bir ustasın!";
+        if (h >= 21) return "Sınırları zorluyorsun! Gerçek bir disiplin abidesisin, potansiyelini zirveye çıkarıyorsun.";
+        if (h >= 17) return "Muazzam bir istikrar! Rakiplerin dinlenirken sen fark attın. Bu tempoyla aşamayacağın engel yok!";
+        if (h >= 12) return "Harika bir hafta! Odaklanma kasların giderek güçleniyor, hedeflerine adım adım yaklaşıyorsun.";
+        if (h >= 8) return "Artık gerçek tempoyu yakaladın! Hedeflerine adım adım yaklaşıyorsun, haftaya vitesi daha da artırabilirsin.";
+        if (h >= 4) return "Mükemmel bir başlangıç! Odaklanma kasların giderek güçleniyor, bu tempoyu sakın bozma.";
+        return "Isınma turlarındayız! Temelleri atıyorsun, haftaya vitesi artırıp gerçek potansiyelini göstereceğine eminim.";
+    };
+
+    const getRank = (h) => {
+        if (h >= 26) return { emoji: '💎', title: 'Yenilmez Makine', gradient: 'linear-gradient(135deg, #6366f1, #a855f7, #ec4899)', textColor: '#fff', next: null, threshold: 26 };
+        if (h >= 24) return { emoji: '🚀', title: 'Efsanevi Momentum', gradient: 'linear-gradient(135deg, #f59e0b, #ef4444)', textColor: '#fff', next: 26, threshold: 24 };
+        if (h >= 21) return { emoji: '🛡️', title: 'Disiplin Ustası', gradient: 'linear-gradient(135deg, #3b82f6, #6366f1)', textColor: '#fff', next: 24, threshold: 21 };
+        if (h >= 17) return { emoji: '⚔️', title: 'İstikrarlı Savaşçı', gradient: 'linear-gradient(135deg, #ef4444, #f97316)', textColor: '#fff', next: 21, threshold: 17 };
+        if (h >= 12) return { emoji: '🎯', title: 'Odak Avcısı', gradient: 'linear-gradient(135deg, #10b981, #059669)', textColor: '#fff', next: 17, threshold: 12 };
+        if (h >= 8) return { emoji: '🚶‍♂️', title: 'Isınma Turu', gradient: 'linear-gradient(135deg, #f59e0b, #fbbf24)', textColor: '#78350f', next: 12, threshold: 8 };
+        if (h >= 4) return { emoji: '🌱', title: 'Odak Çaylağı', gradient: 'linear-gradient(135deg, #a3e635, #65a30d)', textColor: '#fff', next: 8, threshold: 4 };
+        return { emoji: '💤', title: 'Uyuyan Dev', gradient: 'linear-gradient(135deg, #94a3b8, #64748b)', textColor: '#fff', next: 4, threshold: 0 };
+    };
+    const rank = getRank(weeklyHours);
+
+    const renderHeader = () => (
+        <div className="flex justify-between items-start px-5 pt-12 pb-2 bg-white dark:bg-slate-800 sticky top-0 z-20">
+            <div>
+                <div className="text-[10px] font-bold text-gray-400 dark:text-slate-400 uppercase tracking-wider mb-1">DURUM</div>
+                <div className="flex items-center gap-2">
+                    <div className="px-3 py-1.5 rounded-xl flex items-center gap-2 transition-colors" style={{ backgroundColor: dayStatus.color }}>
+                        <span className="text-xs font-bold" style={{ color: dayStatus.textColor }}>{dayStatus.text}</span>
+                    </div>
+                    {streak > 0 && (
+                        <div className="flex items-center gap-1 px-2.5 py-1.5 bg-orange-50 dark:bg-slate-800 rounded-xl border border-transparent dark:border-slate-700">
+                            <span className="text-sm">🔥</span>
+                            <span className="text-xs font-black text-orange-600 dark:text-slate-200">{streak}</span>
+                        </div>
+                    )}
+                    <button onClick={() => openModal('journal')} className="p-1.5 hover:bg-gray-50 rounded-lg text-gray-400 dark:text-slate-400 transition">
+                        <Icons.Journal />
+                    </button>
+                </div>
+            </div>
+            <div className="flex items-center gap-3">
+                <div className="bg-yellow-50 dark:bg-slate-800 text-yellow-700 dark:text-slate-200 px-3 py-1.5 rounded-full font-black text-sm flex items-center gap-1 border border-transparent dark:border-slate-700">
+                    <span>{gold}</span>
+                    <Icons.Coin />
+                </div>
+                <button onClick={() => auth.signOut()} className="p-2 bg-gray-50 dark:bg-slate-700 rounded-full text-gray-400 dark:text-slate-400 hover:bg-gray-100">
+                    <Icons.Logout />
+                </button>
+            </div>
+        </div>
+    );
+
+    const renderDateBar = () => (
+        <div className="mx-5 my-2 bg-gray-50 dark:bg-slate-700 rounded-2xl p-2 flex items-center justify-between">
+            <button onClick={() => {
+                const d = new Date(selectedDate); d.setDate(d.getDate() - 1);
+                setSelectedDate(d);
+            }} className="p-3 text-gray-400 dark:text-slate-400 hover:text-gray-600 hover:bg-white rounded-xl transition">
+                <Icons.ChevronLeft />
+            </button>
+
+            <button onClick={() => setCalendarMode(calendarMode === 'day' ? 'month' : 'day')} className="flex items-center gap-2 px-4 py-2 hover:bg-white rounded-xl transition">
+                <span className="font-bold text-gray-800 dark:text-slate-100 text-sm">{getDayName(selectedDate)}</span>
+                {selectedDate === todayKey && <div className="w-2 h-2 rounded-full bg-indigo-500"></div>}
+            </button>
+
+            <button onClick={() => {
+                const d = new Date(selectedDate); d.setDate(d.getDate() + 1);
+                setSelectedDate(d);
+            }} className="p-3 text-gray-400 dark:text-slate-400 hover:text-gray-600 hover:bg-white rounded-xl transition">
+                <Icons.ChevronRight />
+            </button>
+        </div>
+    );
+
+    const renderDayView = () => (
+        <div className="px-5 pb-24 space-y-6 animate-fade-in">
+            <div className="bg-white dark:bg-slate-800 rounded-3xl p-5 border border-gray-100 dark:border-slate-700 shadow-sm">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-bold text-gray-400 dark:text-slate-400 text-xs uppercase tracking-wider">GÜNLÜK RUTİNLER</h3>
+                </div>
+                <div className="flex justify-between items-center px-2 overflow-x-auto no-scrollbar gap-4">
+                    {habits.map(h => {
+                        const isDone = (currentDayData.habits || []).includes(h.id);
+                        return (
+                            <button key={h.id} onClick={() => toggleHabit(h.id)} className="flex flex-col items-center gap-2 group flex-shrink-0">
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 border-2 ${isDone ? 'bg-indigo-50 dark:bg-indigo-900/60 border-indigo-200 dark:border-indigo-500/30 text-indigo-600 dark:text-indigo-400 scale-110' : 'bg-gray-50 dark:bg-slate-700 border-transparent text-gray-400 dark:text-slate-400 group-hover:bg-white group-hover:border-gray-100'}`}>
+                                    {h.icon}
+                                </div>
+                                <span className={`text-[9px] font-bold transition-colors ${isDone ? 'text-indigo-600' : 'text-gray-300'}`}>{h.title}</span>
+                            </button>
+                        )
+                    })}
+                    {habits.length === 0 && <span className="text-xs text-gray-300">Rutin ekleyin...</span>}
+                </div>
+            </div>
+
+            {(() => {
+                const totalMin = Math.round((currentDayData.tasks || []).reduce((acc, t) => {
+                    if (t.completed) return acc + (Number(t.duration) || 0);
+                    if (t.subItems && t.subItems.length > 0) {
+                        const doneCount = t.subItems.filter(Boolean).length;
+                        const progress = doneCount / t.subItems.length;
+                        return acc + ((Number(t.duration) || 0) * progress);
+                    }
+                    return acc;
+                }, 0));
+                if (totalMin <= 0) return null;
+                const h = Math.floor(totalMin / 60);
+                const m = totalMin % 60;
+                return (
+                    <div className="flex items-center justify-center gap-2 py-2">
+                        <span className="text-lg">🎯</span>
+                        <span className="font-bold text-gray-500 dark:text-slate-400 text-sm">Bugün Odaklanılan Süre:</span>
+                        <span className="font-black text-indigo-600 text-sm">{h > 0 ? `${h} sa ${m > 0 ? m + ' dk' : ''}` : `${m} dk`}</span>
+                    </div>
+                );
+            })()}
+
+            <div className="space-y-3">
+                {(currentDayData.tasks || []).map(t => (
+                    <div key={t.id} className={`bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border transition-all ${t.completed ? 'border-green-100 opacity-60' : 'border-gray-100 dark:border-slate-700'}`}>
+                        <div className="flex items-center gap-4">
+                            {t.type === 'project_slice' ? (
+                                <div className="flex flex-col gap-2 w-full">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <div className={`font-bold text-sm text-gray-800 dark:text-slate-100 ${t.completed ? 'line-through' : ''}`}>{t.title}</div>
+                                            <div className="text-xs text-gray-400 dark:text-slate-400 mt-0.5">{t.duration} dk • {t.targetAmount} adet</div>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            {!t.subItems.every(Boolean) && (
+                                                <button onClick={() => setFocusMode({ active: true, taskId: t.id, taskTitle: t.title, timeLeft: Math.round(Number(t.duration) / t.subItems.length) * 60, isRunning: true })} className="p-2 text-indigo-300 hover:text-indigo-600">
+                                                    <Icons.Play />
+                                                </button>
+                                            )}
+                                            <button onClick={() => deleteTask(t.id)} className="text-gray-300 hover:text-red-500 p-1"><Icons.Trash /></button>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {t.subItems.map((isDone, idx) => (
+                                            <button key={idx} onClick={() => toggleSubItem(t.id, idx)}
+                                                className={`w-8 h-8 rounded-lg border-2 flex items-center justify-center font-bold text-xs transition-all ${isDone ? 'bg-green-500 border-green-500 text-white' : 'border-gray-200 dark:border-slate-700 text-gray-400 dark:text-slate-400 hover:border-indigo-200'}`}>
+                                                {idx + 1}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <button onClick={() => toggleTask(t.id)} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-colors ${t.completed ? 'bg-green-500 border-green-500' : 'border-gray-200 dark:border-slate-700'}`}>
+                                        {t.completed && <Icons.Check stroke="white" />}
+                                    </button>
+                                    <div className="flex-1">
+                                        <div className={`font-bold text-sm text-gray-800 dark:text-slate-100 ${t.completed ? 'line-through' : ''}`}>{t.title}</div>
+                                        <div className="text-xs text-gray-400 dark:text-slate-400 mt-0.5">{t.duration} dk</div>
+                                    </div>
+                                    {!t.completed && (
+                                        <button onClick={() => setFocusMode({ active: true, taskId: t.id, taskTitle: t.title, timeLeft: Number(t.duration) * 60, isRunning: true })} className="p-2 text-indigo-300 hover:text-indigo-600">
+                                            <Icons.Play />
+                                        </button>
+                                    )}
+                                    <button onClick={() => deleteTask(t.id)} className="p-2 text-gray-300 hover:text-red-500"><Icons.Trash /></button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            <button
+                onClick={() => setShowTimeline(true)}
+                className="mx-0 mt-2 mb-2 w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 font-bold text-sm border border-indigo-100 dark:border-indigo-500/30 hover:bg-indigo-100 dark:hover:bg-indigo-800/40 transition-all"
+            >
+                <span>📅</span>
+                <span>Günün Akışını Gör</span>
+            </button>
+        </div>
+    );
+    const renderMonthView = () => (
+        <div className="px-5 pb-24 animate-fade-in">
+            <div className="mb-4 -mx-0">
+                <div className="relative overflow-hidden rounded-2xl p-4" style={{ background: rank.gradient }}>
+                    <div className="absolute top-0 right-0 opacity-10 text-[80px] leading-none -mt-2 -mr-2 select-none">{rank.emoji}</div>
+                    <div className="relative z-10">
+                        <div className="flex items-center gap-3 mb-2">
+                            <span className="text-2xl">{rank.emoji}</span>
+                            <div>
+                                <div className="font-black text-sm" style={{ color: rank.textColor }}>{rank.title}</div>
+                                <div className="text-[10px] font-bold opacity-80" style={{ color: rank.textColor }}>
+                                    Son 7 Gün: {Math.floor(weeklyHours)}s {Math.round(weeklyFocusMin % 60)}dk
+                                </div>
+                            </div>
+                        </div>
+                        {rank.next && (
+                            <div>
+                                <div className="flex justify-between text-[9px] font-bold mb-1 opacity-70" style={{ color: rank.textColor }}>
+                                    <span>{rank.threshold}s</span>
+                                    <span>{rank.next}s</span>
+                                </div>
+                                <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
+                                    <div className="h-full bg-white/80 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, ((weeklyHours - rank.threshold) / (rank.next - rank.threshold)) * 100)}%` }} />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+            <div className="flex items-center justify-between mb-6 pt-2">
+                <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} className="p-2 bg-gray-50 dark:bg-slate-700 rounded-lg text-gray-500 dark:text-slate-400"><Icons.ChevronLeft /></button>
+                <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">
+                    {currentMonth.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
+                </h2>
+                <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} className="p-2 bg-gray-50 dark:bg-slate-700 rounded-lg text-gray-500 dark:text-slate-400"><Icons.ChevronRight /></button>
+            </div>
+
+            <div className="grid grid-cols-7 mb-4">
+                {['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pz'].map(d => (
+                    <div key={d} className="text-center text-xs font-bold text-gray-300">{d}</div>
+                ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-y-4 gap-x-2">
+                {new Array(firstDayOfMonth).fill(null).map((_, i) => <div key={`empty-${i}`} />)}
+
+                {new Array(daysInMonth).fill(null).map((_, i) => {
+                    const d = i + 1;
+                    const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    const isToday = dateStr === todayKey;
+                    const isSelected = dateStr === selectedDate;
+
+                    const dayTasks = dateStr === todayKey ? currentDayData.tasks : (history[dateStr]?.tasks || []);
+                    const dayHabits = dateStr === todayKey ? (currentDayData.habits || []) : (history[dateStr]?.habits || []);
+
+                    let completedCount = 0;
+                    let totalCount = 0;
+                    (dayTasks || []).forEach(t => {
+                        if (t.type === 'project_slice' && t.subItems) {
+                            totalCount += t.subItems.length;
+                            completedCount += t.subItems.filter(Boolean).length;
+                        } else {
+                            totalCount += 1;
+                            if (t.completed) completedCount += 1;
+                        }
+                    });
+
+                    const rate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+                    const status = getStatusInfo(rate, totalCount > 0);
+
+                    let bgStyle = { backgroundColor: status.color, color: status.textColor };
+                    if (!totalCount) bgStyle = { backgroundColor: 'transparent', color: '#9CA3AF' };
+
+                    let borderClass = 'border-gray-100 dark:border-slate-700';
+                    if (isSelected) borderClass = 'border-indigo-600 border-2';
+
+                    // Habit Stats for Rings
+                    const totalHabits = habits.length;
+                    const completedHabitsCount = dayHabits.length;
+
+                    return (
+                        <button key={d} onClick={() => { setSelectedDate(new Date(dateStr)); setCalendarMode('day'); }}
+                            className={`aspect-square rounded-full flex items-center justify-center text-xs font-bold transition-all relative ${borderClass}`}
+                            style={totalCount > 0 ? bgStyle : {}}>
+
+                            {/* HABIT RINGS */}
+                            {totalHabits > 0 && (
+                                <div className="absolute inset-0 -m-1 pointer-events-none">
+                                    <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                                        {new Array(totalHabits).fill(null).map((_, idx) => {
+                                            const isCompleted = idx < completedHabitsCount;
+                                            const color = isCompleted ? '#FFD700' : '#E5E7EB'; // Real Gold vs Gray
+                                            const strokeDash = (250 / totalHabits) - 4; // 4 is gap
+                                            return (
+                                                <circle key={idx} cx="50" cy="50" r="46"
+                                                    fill="none" stroke={color} strokeWidth="6"
+                                                    strokeDasharray={`${strokeDash} ${314 - strokeDash}`} // approx circ
+                                                    strokeDashoffset={0}
+                                                    transform={`rotate(${(360 / totalHabits) * idx} 50 50)`}
+                                                />
+                                            );
+                                        })}
+                                    </svg>
+                                </div>
+                            )}
+
+                            <span className="relative z-10">{d}</span>
+                            {isToday && !totalCount && <div className="absolute -bottom-1 w-1 h-1 rounded-full bg-indigo-500 z-10"></div>}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="flex flex-col h-full w-full max-w-md mx-auto bg-white dark:bg-slate-800 dark:bg-slate-900 shadow-2xl relative overflow-hidden dark:text-gray-100 transition-colors duration-300">
+            {renderHeader()}
+
+            <div className="flex-1 overflow-y-auto no-scrollbar bg-white dark:bg-slate-800 dark:bg-slate-900 transition-colors duration-300">
+                {activeTab === 'calendar' && (
+                    <React.Fragment>
+                        {calendarMode === 'day' && renderDateBar()}
+                        {calendarMode === 'day' ? renderDayView() : renderMonthView()}
+                    </React.Fragment>
+                )}
+
+                {activeTab === 'projects' && (
+                    <div className="p-5 pb-24 space-y-4 animate-fade-in">
+                        <div className="flex justify-between items-center mb-2">
+                            <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Büyük Hedeflerim</h2>
+                            <button onClick={() => openModal('project')} className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl font-bold text-xs hover:bg-indigo-100 transition shadow-sm">
+                                + YENİ
+                            </button>
+                        </div>
+                        {(() => {
+                            const grouped = projects.reduce((acc, p) => {
+                                const cat = p.category || 'Kategorisiz';
+                                if (!acc[cat]) acc[cat] = [];
+                                acc[cat].push(p);
+                                return acc;
+                            }, {});
+                            const categories = Object.keys(grouped).filter(c => c !== 'Kategorisiz').sort();
+                            const uncategorized = grouped['Kategorisiz'] || [];
+
+                            const renderProjectCard = (p) => {
+                                const totalU = Number(p.totalUnit) || 1;
+                                const currentU = Number(p.currentUnit) || 0;
+                                const estTime = Number(p.totalEstTime) || 0;
+
+                                const displayPercent = Math.round((currentU / totalU) * 100);
+                                const barPercent = Math.min(displayPercent, 100);
+                                const remaining = Math.max(0, totalU - currentU);
+                                const hoursLeft = Math.round(remaining * (estTime / totalU));
+                                const isFlipped = localFlippedProjects[p.id];
+                                const isCompleted = currentU >= totalU;
+
+                                return (
+                                    <div key={p.id} className="relative w-full h-[260px] perspective-1000 group mb-6">
+                                        {isCompleted && !isFlipped && (
+                                            <div className="absolute -top-3 -right-3 bg-green-500 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg border-2 border-white z-10 animate-bounce-slow" style={{ zIndex: 10 }}>
+                                                ✅ Tamamlandı
+                                            </div>
+                                        )}
+                                        <div className={`relative w-full h-full text-center transition-transform duration-700 transform-style-3d shadow-sm rounded-3xl ${isFlipped ? 'rotate-y-180' : ''}`}>
+
+                                            {/* FRONT FACE */}
+                                            <div className="absolute w-full h-full backface-hidden bg-white dark:bg-slate-800 p-6 rounded-3xl border border-gray-100 dark:border-slate-700 flex flex-col justify-between" style={{ zIndex: 2 }}>
+                                                <div>
+                                                    <div className="flex justify-between items-start mb-4">
+                                                        <h3 className="font-bold text-gray-800 dark:text-slate-100 text-lg leading-tight text-left cursor-pointer hover:text-indigo-600 transition truncate pr-2" onClick={() => openModal('project', p)}>{p.title}</h3>
+                                                        <div className="flex gap-1 shrink-0">
+                                                            <button onClick={(e) => { e.stopPropagation(); openModal('project', p); }} className="text-gray-300 hover:text-indigo-600 transition p-1">
+                                                                <Icons.Edit />
+                                                            </button>
+                                                            <button onClick={() => setFlippedProjects({ ...localFlippedProjects, [p.id]: true })} className="text-gray-300 hover:text-indigo-600 transition p-1">
+                                                                <Icons.Rotate />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="mb-4 text-left">
+                                                        <span className="bg-gray-50 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-100 dark:border-slate-700 inline-block">
+                                                            {p.icon || '🎯'} {p.currentUnit}/{p.totalUnit} {p.unit}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <div className="flex justify-between items-end mb-2">
+                                                        <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">İLERLEME</span>
+                                                        <span className="text-indigo-600 font-bold text-sm">%{displayPercent}</span>
+                                                    </div>
+
+                                                    <div className="w-full bg-indigo-50 h-3 rounded-full overflow-hidden mb-2">
+                                                        <div className="h-full bg-indigo-500 transition-all duration-500 relative" style={{ width: `${barPercent}%` }}>
+                                                            <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="text-right">
+                                                        <span className="text-[10px] text-gray-400 dark:text-slate-400 font-medium">
+                                                            {hoursLeft !== null ? `Kalan: ~${hoursLeft} saat` : 'Süre hesaplanamıyor'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* BACK FACE (VAULT) */}
+                                            <div className="absolute w-full h-full backface-hidden rotate-y-180 bg-white dark:bg-slate-800 rounded-3xl border border-gray-100 dark:border-slate-700 p-6 flex flex-col" style={{ WebkitBackfaceVisibility: 'hidden' }}>
+                                                <div className="flex justify-between items-center mb-4 border-b border-gray-100 dark:border-slate-700 pb-2">
+                                                    <span className="text-xs font-bold text-gray-400 dark:text-slate-400 uppercase tracking-wider">PROJE KASASI</span>
+                                                    <button onClick={() => setFlippedProjects({ ...localFlippedProjects, [p.id]: false })} className="text-gray-400 dark:text-slate-400 hover:text-gray-600">
+                                                        <Icons.Rotate />
+                                                    </button>
+                                                </div>
+
+                                                <div className="flex-1 mb-3 relative group-inner">
+                                                    <textarea
+                                                        className="w-full h-full bg-gray-800 text-gray-200 text-xs p-3 rounded-xl resize-none outline-none border border-gray-700 focus:border-indigo-500 transition-colors placeholder-gray-500"
+                                                        placeholder="Buraya not, link veya kaynak ekleyebilirsin..."
+                                                        defaultValue={p.notes || ''}
+                                                        onBlur={(e) => {
+                                                            const newNotes = e.target.value;
+                                                            if (p.notes !== newNotes) {
+                                                                const updatedProjects = projects.map(proj => proj.id === p.id ? { ...proj, notes: newNotes } : proj);
+                                                                updateCloud('projects', updatedProjects);
+                                                            }
+                                                        }}
+                                                    ></textarea>
+                                                    <div className="absolute bottom-2 right-2 text-[9px] text-gray-500 dark:text-slate-400 pointer-events-none opacity-50">Otomatik Kaydedilir</div>
+                                                </div>
+
+                                                <button onClick={() => openModal('delete_project', p)} className="w-full text-red-400 text-[10px] font-bold hover:bg-red-50 py-2 rounded-lg transition flex items-center justify-center gap-1">
+                                                    <Icons.Trash /> Projeyi Sil
+                                                </button>
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                );
+                            };
+
+                            return (
+                                <>
+                                    {categories.map(cat => (
+                                        <details key={cat} className="group mb-6 bg-white dark:bg-slate-800 rounded-3xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden list-none">
+                                            <summary className="flex items-center justify-between p-5 cursor-pointer hover:bg-gray-50 transition list-none [&::-webkit-details-marker]:hidden">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-2xl">📂</span>
+                                                    <h3 className="text-lg font-bold text-gray-800 dark:text-slate-100">{cat}</h3>
+                                                    <span className="bg-indigo-100 text-indigo-600 text-xs font-bold px-2 py-1 rounded-lg">{grouped[cat].length}</span>
+                                                </div>
+                                                <span className="text-gray-400 dark:text-slate-400 group-open:rotate-90 transition-transform"><Icons.ChevronRight /></span>
+                                            </summary>
+                                            <div className="p-5 pt-0 border-t border-gray-100 dark:border-slate-700 mt-2">
+                                                <div className="pt-4">
+                                                    {grouped[cat].map(renderProjectCard)}
+                                                </div>
+                                            </div>
+                                        </details>
+                                    ))}
+
+                                    {uncategorized.length > 0 && (
+                                        <div className="mt-2">
+                                            {categories.length > 0 && <h3 className="text-sm font-bold text-gray-400 dark:text-slate-400 uppercase tracking-wider ml-2 mb-4">Serbest Hedefler</h3>}
+                                            {uncategorized.map(renderProjectCard)}
+                                        </div>
+                                    )}
+                                </>
+                            );
+                        })()}
+
+                        <button onClick={() => openModal('templates')} className="w-full border-2 border-dashed border-indigo-200 bg-indigo-50/50 py-4 rounded-3xl flex items-center justify-center gap-3 text-indigo-500 font-bold hover:bg-indigo-50 hover:border-indigo-400 transition-all group">
+                            <span className="text-2xl group-hover:scale-110 transition-transform">🚀</span>
+                            <div className="text-left">
+                                <div className="text-sm">Hazır Program Ekle</div>
+                                <div className="text-[10px] text-indigo-400 font-normal">YKS, Dil ve Kamp Programları</div>
+                            </div>
+                        </button>
+                    </div>
+                )}
+
+                {activeTab === 'routines' && (
+                    <div className="space-y-6 animate-fade-in pb-24 p-5">
+                        <div className="flex justify-between items-center px-1 mb-4">
+                            <div className="flex items-center gap-3">
+                                <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Profil & Gelişim</h1>
+                                <span className="text-xs bg-gray-100 text-gray-500 dark:text-slate-400 px-3 py-1 rounded-full font-bold">V 2.0</span>
+                            </div>
+                            <button onClick={() => openModal('settings')} className="bg-gray-100 text-gray-500 dark:text-slate-400 p-2 rounded-xl hover:bg-gray-200 hover:text-gray-700 transition">
+                                <Icons.Settings />
+                            </button>
+                        </div>
+
+                        {/* HAFTALIK ÖZET BUTONU */}
+                        <div className="animate-fade-in mb-6">
+                            <button onClick={() => openModal('weekly_report')} className="w-full bg-indigo-50 dark:bg-indigo-900/40 border border-indigo-100 dark:border-indigo-500/30 p-4 rounded-3xl font-bold flex items-center justify-between text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-800/60 transition group shadow-sm">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center text-xl shadow-sm group-hover:scale-110 transition-transform">📊</div>
+                                    <div className="text-left">
+                                        <div className="text-sm">Performans Akışı</div>
+                                        <div className="text-xs font-medium opacity-80">Bu Haftanın Özeti</div>
+                                    </div>
+                                </div>
+                                <Icons.ChevronRight />
+                            </button>
+                        </div>
+
+                        {/* SEGMENTED CONTROL KALDIRILDI - ANALİTIK DİREKT GÖSTERİLİYOR */}
+                        <div className="animate-fade-in">
+                            <AnalysisView student={studentData} />
+                        </div>
+
+                        {/* VELİ BAĞLANTISI */}
+                        <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-6 rounded-3xl border border-amber-200 mt-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center text-xl">👨‍👩‍👧</div>
+                                <div>
+                                    <h3 className="font-bold text-amber-900">Veli Bağlantısı</h3>
+                                    <p className="text-amber-700/70 text-xs">Bu kodu velinle paylaş</p>
+                                </div>
+                            </div>
+                            <PairingCodeCard userId={user.uid} existingCode={profile?.pairingCode} updateCloud={updateCloud} />
+                        </div>
+
+                        {/* VERİ YÖNETİMİ - Akordeon */}
+                        <div className="bg-gradient-to-br from-sky-50 to-blue-50 rounded-3xl border border-sky-200 mt-6 overflow-hidden">
+                            <button onClick={() => setDataAccordionOpen(!dataAccordionOpen)} className="w-full flex items-center gap-3 p-6 hover:bg-sky-100/30 transition">
+                                <div className="w-10 h-10 bg-sky-100 rounded-full flex items-center justify-center text-xl">📦</div>
+                                <div className="text-left flex-1">
+                                    <h3 className="font-bold text-sky-900">Veri Yönetimi</h3>
+                                    <p className="text-sky-700/70 text-xs">Verilerini Excel ile yedekle veya geri yükle</p>
+                                </div>
+                                <span className={`text-sky-400 transition-transform duration-200 ${dataAccordionOpen ? 'rotate-180' : ''}`}>▼</span>
+                            </button>
+                            {dataAccordionOpen && (
+                                <div className="px-6 pb-6">
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => {
+                                                const userData = { profile, projects, history, gold, habits, rewards };
+                                                const result = exportToExcel(userData, `${profile?.name || 'Ogrenci'}_Yedek`);
+                                                alert(result.message);
+                                            }}
+                                            className="flex-1 bg-sky-500 hover:bg-sky-600 text-white py-3 rounded-xl font-bold text-sm transition shadow-lg shadow-sky-200 flex items-center justify-center gap-2"
+                                        >
+                                            📥 Excel Olarak Al
+                                        </button>
+                                        <label className="flex-1 bg-white dark:bg-slate-800 hover:bg-sky-50 text-sky-700 py-3 rounded-xl font-bold text-sm transition border-2 border-sky-200 cursor-pointer flex items-center justify-center gap-2">
+                                            📤 Yedek Yükle
+                                            <input type="file" accept=".xlsx,.xls" className="hidden" onChange={async (e) => {
+                                                const file = e.target.files?.[0];
+                                                if (!file) return;
+                                                try {
+                                                    const result = await importFromExcel(file);
+                                                    if (result.data.projects) updateCloud('projects', result.data.projects);
+                                                    if (result.data.history) updateCloud('history', result.data.history);
+                                                    if (result.data.habits) updateCloud('habits', result.data.habits);
+                                                    if (result.data.rewards) updateCloud('rewards', result.data.rewards);
+                                                    if (result.data.gold !== undefined) updateCloud('gold', result.data.gold);
+                                                    const parts = [];
+                                                    if (result.stats.projects) parts.push(`${result.stats.projects} hedef`);
+                                                    if (result.stats.days) parts.push(`${result.stats.days} gün verisi`);
+                                                    if (result.stats.habits) parts.push(`${result.stats.habits} alışkanlık`);
+                                                    if (result.stats.rewards) parts.push(`${result.stats.rewards} ödül`);
+                                                    alert(`✅ Tam Yükleme Başarılı!\n${parts.join(', ')} aktarıldı.`);
+                                                } catch (err) {
+                                                    alert(err.message || 'Hata: Geçersiz dosya formatı.');
+                                                }
+                                                e.target.value = '';
+                                            }} />
+                                        </label>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'store' && (
+                    <div className="p-5 pb-24 animate-fade-in">
+                        <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-100 mb-6">Mağaza</h2>
+
+                        <div className="mb-6 relative overflow-hidden rounded-2xl p-4 border border-cyan-200" style={{ background: 'linear-gradient(135deg, #e0f2fe, #cffafe, #a5f3fc)' }}>
+                            <div className="absolute top-0 right-0 opacity-10 text-[70px] leading-none -mt-1 -mr-1 select-none">&#x1F9CA;</div>
+                            <div className="relative z-10 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <span className="text-3xl">&#x1F9CA;</span>
+                                    <div>
+                                        <div className="font-black text-sm text-cyan-900">Seri Dondurucu</div>
+                                        <div className="text-[10px] font-bold text-cyan-700">Seriyi kaybetmeden 1 g&#xFC;n atla</div>
+                                        <div className="text-[10px] font-bold text-cyan-600 mt-0.5">Mevcut: {streakFreeze}/2</div>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-1">
+                                    <div className="bg-yellow-100 text-yellow-800 text-[10px] font-black px-2 py-0.5 rounded-full">500 GP</div>
+                                    <button
+                                        onClick={() => { if (gold >= 500 && streakFreeze < 2 && confirm('Seri Dondurucu satin alinsin mi? (500 altin)')) { updateCloud('gold', gold - 500); updateCloud('streakFreeze', streakFreeze + 1); } }}
+                                        disabled={gold < 500 || streakFreeze >= 2}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition ${gold >= 500 && streakFreeze < 2 ? 'bg-cyan-600 text-white hover:bg-cyan-700' : 'bg-gray-200 text-gray-400 dark:text-slate-400 cursor-not-allowed'}`}
+                                    >
+                                        {streakFreeze >= 2 ? 'Maksimum' : 'Satin Al'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            {rewards.map(r => (
+                                <div key={r.id} onClick={() => setFlippedCards({ ...flippedCards, [r.id]: !flippedCards[r.id] })}
+                                    className="aspect-square bg-gray-50 dark:bg-slate-700 rounded-2xl flex flex-col items-center justify-center p-4 border border-gray-100 dark:border-slate-700 relative group">
+                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteReward(r.id); }} className="absolute top-2 right-2 w-6 h-6 bg-red-100 text-red-400 rounded-full text-xs font-bold opacity-0 group-hover:opacity-100 transition hover:bg-red-200 hover:text-red-600 flex items-center justify-center">✕</button>
+                                    {flippedCards[r.id] ? (
+                                        <button onClick={(e) => { e.stopPropagation(); handlePurchase(r); }} className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold">Satın Al</button>
+                                    ) : (
+                                        <>
+                                            <div className="text-4xl mb-2">{r.icon}</div>
+                                            <div className="font-bold text-sm text-center">{r.title}</div>
+                                            <div className="mt-2 bg-yellow-100 text-yellow-800 text-[10px] font-black px-2 py-0.5 rounded-full">{r.cost} GP</div>
+                                        </>
+                                    )}
+                                </div>
+                            ))}
+                            <button onClick={() => openModal('reward')} className="aspect-square bg-gray-900 text-white rounded-2xl flex flex-col items-center justify-center gap-2">
+                                <Icons.Plus />
+                                <span className="font-bold text-xs">Ödül Ekle</span>
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <div className="flex-none bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-slate-700 flex justify-around items-center pb-6 pt-2 z-30">
+                <button onClick={() => { setActiveTab('calendar'); setCalendarMode('month'); }} className={`flex flex-col items-center gap-1 p-2 transition-colors ${activeTab === 'calendar' && calendarMode === 'month' ? 'text-indigo-600' : 'text-gray-300'}`}>
+                    <Icons.Calendar />
+                    <span className="text-[9px] font-bold tracking-wide">TAKVİM</span>
+                </button>
+                <button onClick={() => setActiveTab('projects')} className={`flex flex-col items-center gap-1 p-2 transition-colors ${activeTab === 'projects' ? 'text-indigo-600' : 'text-gray-300'}`}>
+                    <Icons.Briefcase />
+                    <span className="text-[9px] font-bold tracking-wide">HEDEF</span>
+                </button>
+
+                <div className="relative -top-6 flex flex-col items-center">
+                    <button onClick={() => {
+                        if (activeTab === 'calendar' && calendarMode === 'month') {
+                            setCalendarMode('day');
+                        } else {
+                            openModal('taskId', null);
+                        }
+                    }} className="w-14 h-14 bg-indigo-600 hover:bg-indigo-700 rounded-full shadow-lg shadow-indigo-300 flex items-center justify-center text-white transform active:scale-95 transition-all border-4 border-white dark:border-slate-900">
+                        <Icons.Plus />
+                    </button>
+                    <button onClick={() => { setSelectedDate(new Date()); setCalendarMode('day'); setActiveTab('calendar'); }} className="mt-1 bg-indigo-50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm hover:bg-indigo-100 dark:hover:bg-slate-700 border border-transparent dark:border-slate-700 transition-colors">
+                        BUGÜN
+                    </button>
+                </div>
+
+                <button onClick={() => setActiveTab('store')} className={`flex flex-col items-center gap-1 p-2 transition-colors ${activeTab === 'store' ? 'text-indigo-600' : 'text-gray-300'}`}>
+                    <Icons.Store />
+                    <span className="text-[9px] font-bold tracking-wide">MAĞAZA</span>
+                </button>
+                <button onClick={() => setActiveTab('routines')} className={`flex flex-col items-center gap-1 p-2 transition-colors ${activeTab === 'routines' ? 'text-indigo-600' : 'text-gray-300'}`}>
+                    <Icons.User />
+                    <span className="text-[9px] font-bold tracking-wide">PROFİLİM</span>
+                </button>
+            </div>
+
+            {modal.open && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-sm p-6 shadow-2xl relative">
+                        <button onClick={closeModal} className="absolute top-4 right-4 text-gray-400 dark:text-slate-400 hover:text-gray-600"><Icons.Close /></button>
+
+                        {modal.type === 'templates' && (
+                            <div className="space-y-4">
+                                <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Hazır Programlar</h2>
+                                <p className="text-sm text-gray-500 dark:text-slate-400">Senin için hazırladığımız popüler çalışma programları.</p>
+                                <div className="space-y-3 max-h-[400px] overflow-y-auto no-scrollbar py-1">
+                                    {(() => {
+                                        const renderTemplateButton = (t) => (
+                                            <button key={t.id || t.title} onClick={() => handleImportTemplate(t)} className="w-full bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 p-4 rounded-2xl flex items-center gap-4 hover:border-indigo-200 hover:shadow-md hover:shadow-indigo-100 transition-all group text-left relative overflow-hidden">
+                                                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${t.color} flex items-center justify-center text-2xl text-white shadow-sm group-hover:scale-110 transition-transform shrink-0`}>
+                                                    {t.icon}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="font-bold text-gray-800 dark:text-slate-100 text-sm group-hover:text-indigo-700 transition-colors">{t.title}</div>
+                                                    <div className="text-[10px] text-gray-400 dark:text-slate-400 mt-0.5 line-clamp-2">{t.desc}</div>
+                                                    <div className="flex flex-wrap gap-2 mt-2">
+                                                        <span className="bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-slate-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-gray-100 dark:border-slate-700">{t.totalUnit} {t.unit}</span>
+                                                        <span className="bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-slate-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-gray-100 dark:border-slate-700">~{t.totalEstTime} Saat</span>
+                                                    </div>
+                                                </div>
+                                                <div className="text-indigo-300 opacity-0 group-hover:opacity-100 transition-opacity absolute right-4">
+                                                    <Icons.ChevronRight />
+                                                </div>
+                                            </button>
+                                        );
+
+                                        return PRESET_CATEGORIES.map(cat => (
+                                            <details key={cat.title} className="group/main mb-3 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-3xl shadow-sm overflow-hidden list-none">
+                                                <summary className="flex items-center justify-between p-5 cursor-pointer hover:bg-gray-50 transition list-none [&::-webkit-details-marker]:hidden">
+                                                    <div className="flex items-center gap-4">
+                                                        <span className="text-3xl drop-shadow-sm">{cat.icon}</span>
+                                                        <h3 className="text-xl font-bold text-gray-800 dark:text-slate-100">{cat.title}</h3>
+                                                    </div>
+                                                    <span className="text-gray-400 dark:text-slate-400 group-open/main:rotate-90 transition-transform"><Icons.ChevronRight /></span>
+                                                </summary>
+                                                <div className="pb-4 px-4 space-y-3 border-t border-gray-50 pt-3 bg-gray-50/30">
+                                                    {cat.subcategories && cat.subcategories.map(sub => (
+                                                        <details key={sub.title} className="group/sub bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl overflow-hidden list-none shadow-sm">
+                                                            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition list-none [&::-webkit-details-marker]:hidden">
+                                                                <div className="flex items-center gap-3">
+                                                                    <span className="text-xl">📁</span>
+                                                                    <h4 className="font-bold text-gray-700 text-md">{sub.title}</h4>
+                                                                </div>
+                                                                <div className="flex items-center gap-3 relative">
+                                                                    <span className="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-lg text-xs font-bold">{sub.items.length} Program</span>
+                                                                    <span className="text-gray-400 dark:text-slate-400 group-open/sub:rotate-90 transition-transform"><Icons.ChevronRight /></span>
+                                                                </div>
+                                                            </summary>
+                                                            <div className="p-4 pt-1 bg-gray-50/50 border-t border-gray-100 dark:border-slate-700">
+                                                                <div className="space-y-3 mt-3">
+                                                                    {sub.items.length === 0 ? (
+                                                                        <div className="text-center text-sm font-medium text-gray-400 dark:text-slate-400 py-6 border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-2xl bg-white dark:bg-slate-800">Yakında Eklenecek</div>
+                                                                    ) : sub.items.map(renderTemplateButton)}
+                                                                </div>
+                                                            </div>
+                                                        </details>
+                                                    ))}
+                                                    {cat.items && cat.items.length > 0 && (
+                                                        <div className="space-y-3 mt-2">
+                                                            {cat.items.map(renderTemplateButton)}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </details>
+                                        ))
+                                    })()}
+                                </div>
+                            </div>
+                        )}
+
+                        {modal.type === 'delete_project' && (
+                            <div className="space-y-4 text-center">
+                                <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto text-red-500 text-3xl mb-2">
+                                    <Icons.Trash />
+                                </div>
+                                <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Projeyi Sil?</h2>
+                                <p className="text-sm text-gray-500 dark:text-slate-400">
+                                    <span className="font-bold text-gray-700">"{modal.data?.title}"</span> projesini silmek istediğine emin misin? Bu işlem geri alınamaz.
+                                </p>
+                                <div className="flex gap-3 mt-6">
+                                    <button onClick={closeModal} className="flex-1 py-3 rounded-xl font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition">Vazgeç</button>
+                                    <button onClick={() => { handleDeleteProject(modal.data.id); closeModal(); }} className="flex-1 py-3 rounded-xl font-bold bg-red-500 text-white hover:bg-red-600 transition shadow-lg shadow-red-200">Evet, Sil</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {modal.type === 'taskId' && (
+                            <div className="space-y-4">
+                                {!form.projectId ? (
+                                    <>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Ne Ekleyelim?</h2>
+                                        </div>
+
+                                        <button onClick={() => setForm({ ...form, type: 'simple', projectId: 'simple' })} className="w-full bg-indigo-600 text-white p-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition transform active:scale-95">
+                                            <Icons.Plus />
+                                            Tek Seferlik Görev
+                                        </button>
+
+                                        <div className="mt-6">
+                                            <h3 className="text-xs font-bold text-gray-400 dark:text-slate-400 uppercase tracking-wider mb-3">HEDEFLERDEN ÇEK</h3>
+                                            <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
+                                                {projects.map(p => {
+                                                    const isCompleted = (Number(p.currentUnit) || 0) >= (Number(p.totalUnit) || 1);
+                                                    return (
+                                                        <button key={p.id} onClick={() => {
+                                                            if (isCompleted) {
+                                                                setForm({ ...form, projectId: 'completed_warning', pendingProjectId: p.id, pendingUnit: p.unit });
+                                                            } else {
+                                                                setForm({ ...form, type: 'import', projectId: p.id, unit: p.unit });
+                                                            }
+                                                        }} className={`w-full bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 p-4 rounded-2xl flex items-center justify-between hover:border-indigo-200 hover:bg-indigo-50 transition group ${isCompleted ? 'opacity-60 saturate-50' : ''}`}>
+                                                            <span className="font-bold text-gray-800 dark:text-slate-100 group-hover:text-indigo-700 flex items-center gap-2">
+                                                                {p.title} {isCompleted && <span title="Tamamlandı">✅</span>}
+                                                            </span>
+                                                            <span className="text-xs font-bold bg-gray-100 text-gray-500 dark:text-slate-400 px-2 py-1 rounded-lg group-hover:bg-white group-hover:text-indigo-500">{p.unit}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                                {projects.length === 0 && <div className="text-gray-400 dark:text-slate-400 text-sm text-center py-4">Henüz hedef eklemedin.</div>}
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : form.projectId === 'simple' ? (
+                                    <>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <button onClick={() => setForm({})} className="p-2 -ml-2 text-gray-400 dark:text-slate-400 hover:text-gray-600"><Icons.ChevronLeft /></button>
+                                            <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Tek Seferlik Görev</h2>
+                                        </div>
+                                        <input placeholder="Ne yapacaksın?" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none border border-transparent focus:bg-white focus:border-indigo-200" value={form.title || ''} onChange={e => setForm({ ...form, title: e.target.value })} />
+                                        <div className="flex gap-2">
+                                            <select className="flex-1 p-3 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-600 dark:text-slate-100 outline-none" value={form.time || '30'} onChange={e => setForm({ ...form, time: e.target.value })}>
+                                                <option value="15">15 dk</option>
+                                                <option value="30">30 dk</option>
+                                                <option value="45">45 dk</option>
+                                                <option value="60">1 sa</option>
+                                                <option value="90">1.5 sa</option>
+                                                <option value="120">2 sa</option>
+                                            </select>
+                                            <div className="flex-1 relative">
+                                                <input
+                                                    type="time"
+                                                    className="w-full p-3 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-600 dark:text-slate-100 outline-none border border-transparent focus:border-indigo-200"
+                                                    value={form.startTime || ''}
+                                                    onChange={e => setForm({ ...form, startTime: e.target.value })}
+                                                    title="Başlangıç Saati (İsteğe Bağlı)"
+                                                />
+                                                {!form.startTime && <span className="absolute top-1/2 -translate-y-1/2 left-3 text-[10px] text-gray-400 pointer-events-none font-normal">Saat (opsiyonel)</span>}
+                                            </div>
+                                        </div>
+                                        <button onClick={() => handleAddTask('simple')} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition">Ekle</button>
+                                    </>
+                                ) : form.projectId === 'completed_warning' ? (
+                                    <>
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <button onClick={() => setForm({})} className="p-2 -ml-2 text-gray-400 dark:text-slate-400 hover:text-gray-600"><Icons.ChevronLeft /></button>
+                                            <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Hedef Tamamlandı!</h2>
+                                        </div>
+                                        <div className="bg-amber-50 border border-amber-200 rounded-3xl p-8 text-center mt-4 shadow-sm">
+                                            <div className="text-6xl mb-4 animate-bounce-slow">🏆</div>
+                                            <h3 className="text-xl font-bold text-amber-900 mb-2">Harika İş!</h3>
+                                            <p className="text-amber-700/80 text-sm leading-relaxed mb-8">
+                                                Bu büyük hedefi zaten tamamladın. Yeni bir maceraya atılmak ve taze bir hedef oluşturmak ister misin?
+                                            </p>
+                                            <div className="flex flex-col gap-3">
+                                                <button onClick={() => {
+                                                    openModal('project');
+                                                    setActiveTab('projects');
+                                                }} className="w-full bg-amber-500 text-white py-4 rounded-2xl font-bold hover:bg-amber-600 transition shadow-lg shadow-amber-200 text-sm">
+                                                    + Yeni Hedef Oluştur
+                                                </button>
+                                                <button onClick={() => {
+                                                    setForm({ ...form, type: 'import', projectId: form.pendingProjectId, unit: form.pendingUnit });
+                                                }} className="w-full bg-white dark:bg-slate-800 text-gray-500 dark:text-slate-400 border-2 border-transparent hover:border-gray-200 py-4 rounded-2xl font-bold transition text-sm">
+                                                    Yine de devam et
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <button onClick={() => setForm({})} className="p-2 -ml-2 text-gray-400 dark:text-slate-400 hover:text-gray-600"><Icons.ChevronLeft /></button>
+                                            <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Projeden Çek</h2>
+                                        </div>
+
+                                        <div className="text-center mb-6">
+                                            <h3 className="text-indigo-600 font-bold text-lg">{projects.find(p => String(p.id) === String(form.projectId))?.title}</h3>
+                                        </div>
+
+                                        <div className="flex items-center justify-center gap-4 mb-6">
+                                            <div className="flex items-center bg-gray-50 dark:bg-slate-700 rounded-2xl p-2 border border-gray-100 dark:border-slate-700">
+                                                <input type="number" className="w-16 bg-transparent text-center font-bold text-2xl outline-none text-gray-800 dark:text-slate-100" value={form.amount || ''} onChange={e => {
+                                                    const val = e.target.value;
+                                                    const p = projects.find(pr => String(pr.id) === String(form.projectId));
+                                                    let time = '';
+                                                    if (val && p && p.totalEstTime && p.totalUnit) {
+                                                        const timePerUnit = (p.totalEstTime * 60) / p.totalUnit;
+                                                        time = Math.round(timePerUnit * Number(val));
+                                                    }
+                                                    setForm({ ...form, amount: val, time: time });
+                                                }} placeholder="0" />
+                                                <span className="text-xs font-bold text-gray-400 dark:text-slate-400 pr-2 border-l border-gray-200 dark:border-slate-700 pl-2">{form.unit}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 bg-gray-50 dark:bg-slate-700 p-3 rounded-xl mb-4">
+                                            <span className="text-gray-400 dark:text-slate-400 text-sm font-bold">Süre (dk):</span>
+                                            <input type="number" className="flex-1 bg-transparent font-bold text-gray-800 dark:text-slate-100 outline-none text-right" value={form.time || ''} onChange={e => setForm({ ...form, time: e.target.value })} placeholder="Otomatik" />
+                                        </div>
+
+                                        <div className="flex items-center gap-2 bg-gray-50 dark:bg-slate-700 p-3 rounded-xl mb-6">
+                                            <span className="text-gray-400 dark:text-slate-400 text-sm font-bold">🕐 Başlangıç:</span>
+                                            <input
+                                                type="time"
+                                                className="flex-1 bg-transparent font-bold text-gray-700 dark:text-slate-100 outline-none text-right"
+                                                value={form.startTime || ''}
+                                                onChange={e => setForm({ ...form, startTime: e.target.value })}
+                                                title="Başlangıç Saati (İsteğe Bağlı)"
+                                            />
+                                            {!form.startTime && <span className="text-[10px] text-gray-400 font-normal">opsiyonel</span>}
+                                        </div>
+
+                                        <button onClick={() => handleAddTask('import')} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">
+                                            Planına Ekle
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        )}
+
+                        {modal.type === 'project' && (
+                            <div className="space-y-4">
+                                <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">{modal.data ? 'Hedefi Düzenle' : 'Yeni Hedef'}</h2>
+                                {(() => {
+                                    const existingCategories = [...new Set((projects || []).map(p => p?.category).filter(Boolean))];
+                                    return (
+                                        <>
+                                            <input placeholder="Kategori (Opsiyonel)" list="category-list" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none focus:bg-white focus:border focus:border-indigo-200 transition" value={form.category !== undefined ? form.category : (modal.data?.category ?? '')} onChange={e => setForm({ ...form, category: e.target.value })} />
+                                            <datalist id="category-list">
+                                                {existingCategories.map(cat => <option key={cat} value={cat} />)}
+                                            </datalist>
+                                        </>
+                                    );
+                                })()}
+                                <input placeholder="Hedef Adı (örn: Matematik)" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.title !== undefined ? form.title : (modal.data?.title ?? '')} onChange={e => setForm({ ...form, title: e.target.value })} />
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input type="number" placeholder="Toplam" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.total !== undefined ? form.total : (modal.data?.totalUnit ?? '')} onChange={e => setForm({ ...form, total: e.target.value })} />
+                                    <input placeholder="Birim (Soru, Sayfa)" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.unit !== undefined ? form.unit : (modal.data?.unit ?? '')} onChange={e => setForm({ ...form, unit: e.target.value })} />
+                                </div>
+                                <input type="number" placeholder="Şu anki Durum" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.current !== undefined ? form.current : (modal.data?.currentUnit ?? '')} onChange={e => setForm({ ...form, current: e.target.value })} />
+                                <input type="number" placeholder="Tahmini Toplam Saat" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.estTime !== undefined ? form.estTime : (modal.data?.totalEstTime ?? '')} onChange={e => setForm({ ...form, estTime: e.target.value })} />
+
+                                <button onClick={modal.data ? handleEditProject : handleAddProject} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition">{modal.data ? 'Kaydet' : 'Oluştur'}</button>
+                            </div>
+                        )}
+
+                        {modal.type === 'reward' && (
+                            <div className="space-y-4">
+                                <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Yeni Ödül</h2>
+                                <div className="flex gap-2">
+                                    <input placeholder="🎁" className="w-16 p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-2xl text-center outline-none" value={form.icon || ''} onChange={e => setForm({ ...form, icon: e.target.value })} />
+                                    <input placeholder="Ödül Adı" className="flex-1 p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.title || ''} onChange={e => setForm({ ...form, title: e.target.value })} />
+                                </div>
+                                <input type="number" placeholder="Maliyet (GP)" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.cost || ''} onChange={e => setForm({ ...form, cost: e.target.value })} />
+                                <button onClick={handleAddReward} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition">Ekle</button>
+                            </div>
+                        )}
+
+                        {modal.type === 'settings' && (
+                            <div className="space-y-6">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Ayarlar</h2>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <button onClick={() => openModal('settings_profile')} className="w-full bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 p-4 rounded-2xl font-bold text-gray-700 flex items-center gap-4 hover:border-gray-200 transition group">
+                                        <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/20 text-indigo-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                            <Icons.User />
+                                        </div>
+                                        <span className="flex-1 text-left dark:text-slate-200">Profil Ayarlari</span>
+                                        <Icons.ChevronRight />
+                                    </button>
+                                    <button onClick={() => openModal('settings_routines')} className="w-full bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 p-4 rounded-2xl font-bold text-gray-700 flex items-center gap-4 hover:border-gray-200 transition group">
+                                        <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-500/20 text-orange-500 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+                                            🌅
+                                        </div>
+                                        <span className="flex-1 text-left dark:text-slate-200">Gunluk Rutinler Ayarlari</span>
+                                        <Icons.ChevronRight />
+                                    </button>
+                                    <button onClick={() => openModal('settings_messages')} className="w-full bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 p-4 rounded-2xl font-bold text-gray-700 flex items-center gap-4 hover:border-gray-200 transition group">
+                                        <div className="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-500/20 text-sky-500 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+                                            💬
+                                        </div>
+                                        <span className="flex-1 text-left dark:text-slate-200">Mentordan Mesajlar</span>
+                                        <Icons.ChevronRight />
+                                    </button>
+                                </div>
+
+                                <div className="pt-2">
+                                    <button onClick={() => { closeModal(); auth.signOut(); }} className="w-full bg-red-50 text-red-600 p-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition">
+                                        <Icons.Logout />
+                                        Cikis Yap
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {modal.type === 'settings_profile' && (
+                            <div className="space-y-6">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <button onClick={() => openModal('settings')} className="p-2 -ml-2 text-gray-400 dark:text-slate-400 hover:text-gray-600 transition"><Icons.ChevronLeft /></button>
+                                    <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Profil Ayarlari</h2>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider shrink-0">GİRİŞ BİLGİLERİ</label>
+
+                                    <div className="bg-gray-50 dark:bg-slate-700 border border-gray-100 dark:border-slate-700 p-4 rounded-2xl">
+                                        <div className="text-xs font-bold text-gray-400 dark:text-slate-400 mb-1">İsim</div>
+                                        <input
+                                            readOnly
+                                            value={profile?.name || 'İsimsiz Öğrenci'}
+                                            className="w-full bg-transparent font-bold text-gray-800 dark:text-slate-100 outline-none"
+                                        />
+                                    </div>
+
+                                    <div className="bg-gray-50 dark:bg-slate-700 border border-gray-100 dark:border-slate-700 p-4 rounded-2xl">
+                                        <div className="text-xs font-bold text-gray-400 dark:text-slate-400 mb-1">E-posta Adresi</div>
+                                        <input
+                                            readOnly
+                                            value={user?.email || profile?.email || 'Bilinmiyor'}
+                                            className="w-full bg-transparent font-bold text-gray-800 dark:text-slate-100 outline-none"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3 mb-6">
+                                    <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-2">Görünüm Ayarları</label>
+                                    <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 p-4 rounded-2xl flex items-center justify-between shadow-sm transition-all hover:border-gray-200">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shadow-sm transition-colors ${isDarkMode ? 'bg-gray-800 text-yellow-400' : 'bg-indigo-50 text-indigo-500'}`}>
+                                                {isDarkMode ? '🌙' : '☀️'}
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="font-bold text-sm text-gray-800 dark:text-slate-100">Karanlık Mod</span>
+                                                <span className="text-[10px] text-gray-400 dark:text-slate-400 font-medium">Sistemi yormayan göz dostu tema</span>
+                                            </div>
+                                        </div>
+                                        <button onClick={toggleDarkMode} className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none ${isDarkMode ? 'bg-indigo-500' : 'bg-gray-200'}`}>
+                                            <span className={`${isDarkMode ? 'translate-x-6' : 'translate-x-1'} inline-block w-4 h-4 transform bg-white dark:bg-slate-800 rounded-full transition-transform shadow-sm`} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-2">HESAP İŞLEMLERİ</label>
+                                    <button onClick={() => openModal('update_email')} className="w-full bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 p-4 rounded-2xl font-bold text-gray-700 flex justify-between items-center hover:border-gray-200 transition">
+                                        <span className="dark:text-slate-200">E-posta Güncelle</span>
+                                        <Icons.ChevronRight />
+                                    </button>
+                                    <button onClick={() => openModal('update_password')} className="w-full bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 p-4 rounded-2xl font-bold text-gray-700 flex justify-between items-center hover:border-gray-200 transition">
+                                        <span className="dark:text-slate-200">Şifre Güncelle</span>
+                                        <Icons.ChevronRight />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {modal.type === 'weekly_report' && (() => {
+                            const { totalHours, totalMinutes, hoursFloat } = calculateCurrentWeekFocus(history);
+                            const tier = getWeeklyTier(hoursFloat);
+                            const mentorQuote = getWeeklyMentorQuote(hoursFloat);
+                            const studentName = profile.name || 'Öğrenci';
+
+                            const handleDownloadReport = () => {
+                                const canvas = document.createElement('canvas');
+                                canvas.width = 1080;
+                                canvas.height = 1920;
+                                const ctx = canvas.getContext('2d');
+
+                                // ── 1. BACKGROUND: Dual-tone vertical gradient ──
+                                const bgGrad = ctx.createLinearGradient(0, 0, 0, 1920);
+                                bgGrad.addColorStop(0, tier.canvasBg[0]);
+                                bgGrad.addColorStop(0.6, tier.canvasBg[1]);
+                                bgGrad.addColorStop(1, '#000000');
+                                ctx.fillStyle = bgGrad;
+                                ctx.fillRect(0, 0, 1080, 1920);
+
+                                // ── 2. TEXTURE: Scattered star dots ──
+                                ctx.fillStyle = 'rgba(255,255,255,0.06)';
+                                const starPositions = [
+                                    [80, 120], [200, 90], [450, 60], [700, 130], [950, 80], [1020, 200],
+                                    [30, 400], [160, 350], [880, 320], [1050, 500], [60, 700], [300, 750],
+                                    [750, 680], [980, 720], [120, 1050], [400, 1000], [820, 1100], [1040, 1000],
+                                    [200, 1350], [600, 1300], [900, 1400], [50, 1600], [700, 1650], [1000, 1550],
+                                    [350, 1800], [600, 1850], [850, 1820]
+                                ];
+                                starPositions.forEach(([sx, sy]) => {
+                                    ctx.beginPath();
+                                    ctx.arc(sx, sy, Math.random() * 3 + 1.5, 0, Math.PI * 2);
+                                    ctx.fill();
+                                });
+
+                                // ── 3. TOP SEPARATOR LINE ──
+                                ctx.fillStyle = 'rgba(255,255,255,0.15)';
+                                ctx.fillRect(80, 185, 920, 2);
+
+                                // ── 4. TITLE: HAFTALIK RAPORUN ──
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'alphabetic';
+                                ctx.fillStyle = 'rgba(255,255,255,0.55)';
+                                ctx.font = 'bold 52px system-ui, sans-serif';
+                                ctx.fillText('HAFTALIK RAPORUN', 540, 145);
+
+                                // ── 5. STUDENT NAME ──
+                                ctx.font = 'bold 44px system-ui, sans-serif';
+                                ctx.fillStyle = '#ffffff';
+                                ctx.fillText(studentName.toUpperCase(), 540, 255);
+
+                                // Separator line below name
+                                ctx.fillStyle = 'rgba(255,255,255,0.15)';
+                                ctx.fillRect(80, 280, 920, 2);
+
+                                // ── 6. RANK EMOJI (large, centred) ──
+                                ctx.font = '200px system-ui, sans-serif';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillStyle = '#ffffff';
+                                ctx.fillText(tier.emoji, 540, 520);
+
+                                // ── 7. RANK TITLE ──
+                                ctx.textBaseline = 'alphabetic';
+                                ctx.font = '900 72px system-ui, sans-serif';
+                                ctx.fillStyle = 'rgba(255,255,255,0.9)';
+                                ctx.fillText(tier.title, 540, 700);
+
+                                // ── 8. TIME LABEL ──
+                                ctx.font = 'bold 40px system-ui, sans-serif';
+                                ctx.fillStyle = 'rgba(255,255,255,0.55)';
+                                ctx.fillText('BU HAFTA ODAKLANILAN SÜRE', 540, 820);
+
+                                // ── 9. TIME VALUE with NEON GLOW ──
+                                ctx.save();
+                                ctx.shadowColor = 'rgba(255,255,255,0.65)';
+                                ctx.shadowBlur = 48;
+                                ctx.font = '900 168px system-ui, sans-serif';
+                                ctx.fillStyle = '#ffffff';
+                                const timeStr = `${totalHours} SAAT ${totalMinutes} DK`;
+                                ctx.fillText(timeStr, 540, 1020);
+                                ctx.restore();
+
+                                // ── 10. SUBTLE DIVIDER ──
+                                ctx.fillStyle = 'rgba(255,255,255,0.12)';
+                                ctx.fillRect(140, 1060, 800, 2);
+
+                                // ── 11. MENTOR QUOTE (wrapped, italic) ──
+                                const wrapText = (context, text, x, y, maxWidth, lineHeight, font, fillStyle) => {
+                                    context.font = font;
+                                    context.fillStyle = fillStyle;
+                                    const words = text.split(' ');
+                                    let line = '';
+                                    let lines = [];
+                                    words.forEach(word => {
+                                        const testLine = line + word + ' ';
+                                        const metrics = context.measureText(testLine);
+                                        if (metrics.width > maxWidth && line !== '') {
+                                            lines.push(line.trim());
+                                            line = word + ' ';
+                                        } else {
+                                            line = testLine;
+                                        }
+                                    });
+                                    lines.push(line.trim());
+                                    const totalH = lines.length * lineHeight;
+                                    const startY = y - (totalH / 2) + lineHeight / 2;
+                                    lines.forEach((l, i) => {
+                                        const drawLine = (i === 0 ? '\"' : '') + l + (i === lines.length - 1 ? '\"' : '');
+                                        context.fillText(drawLine, x, startY + i * lineHeight);
+                                    });
+                                };
+
+                                wrapText(
+                                    ctx,
+                                    mentorQuote,
+                                    540, 1280,
+                                    860, 68,
+                                    'italic 38px Georgia, serif',
+                                    'rgba(255,255,255,0.82)'
+                                );
+
+                                // ── 12. BOTTOM RULE ──
+                                ctx.fillStyle = 'rgba(255,255,255,0.12)';
+                                ctx.fillRect(140, 1540, 800, 2);
+
+                                // ── 13. FOOTER BRANDING ──
+                                ctx.font = 'bold 40px system-ui, sans-serif';
+                                ctx.fillStyle = 'rgba(255,255,255,0.45)';
+                                ctx.textAlign = 'center';
+                                ctx.fillText('myLifeOS Cloud Edition', 540, 1620);
+                                ctx.font = '36px system-ui, sans-serif';
+                                ctx.fillStyle = 'rgba(255,255,255,0.30)';
+                                ctx.fillText('Haftanın Özeti', 540, 1680);
+
+                                // ── EXPORT (in-memory only, no DOM residue) ──
+                                const dataUrl = canvas.toDataURL('image/png');
+                                const link = document.createElement('a');
+                                link.download = 'haftalik-rapor.png';
+                                link.href = dataUrl;
+                                link.click();
+                            };
+
+                            // ── PREMIUM MODAL UI ──
+                            const gradStart = tier.canvasBg[0];
+                            const gradEnd = tier.canvasBg[1];
+
+                            return (
+                                <div className="space-y-5">
+                                    {/* Header */}
+                                    <div className="text-center">
+                                        <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Haftalık Özet</h2>
+                                    </div>
+
+                                    {/* Main Premium Card */}
+                                    <div className="rounded-3xl overflow-hidden shadow-2xl" style={{ background: `linear-gradient(160deg, ${gradStart}, ${gradEnd})` }}>
+                                        {/* Time block */}
+                                        <div className="px-6 pt-8 pb-4 text-center">
+                                            <div className="text-[11px] font-bold text-white/60 uppercase tracking-[0.2em] mb-3">BU HAFTA ODAKLANILAN SÜRE</div>
+                                            <div className="flex items-end justify-center gap-2 mb-1">
+                                                <span className="text-6xl font-black text-white leading-none" style={{ textShadow: '0 0 30px rgba(255,255,255,0.4)' }}>{totalHours}</span>
+                                                <span className="text-xl font-bold text-white/70 mb-2">SAAT</span>
+                                                <span className="text-6xl font-black text-white leading-none" style={{ textShadow: '0 0 30px rgba(255,255,255,0.4)' }}>{totalMinutes}</span>
+                                                <span className="text-xl font-bold text-white/70 mb-2">DK</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Divider */}
+                                        <div className="mx-6 h-px bg-white/20" />
+
+                                        {/* Rank block */}
+                                        <div className="px-6 py-5 text-center">
+                                            <div className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-3">HAFTANIN RÜTBESİ</div>
+                                            <div className="text-5xl mb-2" style={{ filter: 'drop-shadow(0 0 12px rgba(255,255,255,0.5))' }}>{tier.emoji}</div>
+                                            <div className="text-xl font-black text-white tracking-wide">{tier.title}</div>
+                                        </div>
+
+                                        {/* Divider */}
+                                        <div className="mx-6 h-px bg-white/20" />
+
+                                        {/* Mentor Quote */}
+                                        <div className="px-6 py-5 text-center">
+                                            <p className="text-white/85 text-sm leading-relaxed" style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic' }}>
+                                                &ldquo;{mentorQuote}&rdquo;
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Download Button */}
+                                    <div>
+                                        <button onClick={handleDownloadReport} className="w-full text-white p-4 rounded-2xl font-bold flex justify-center items-center gap-2 transition shadow-lg" style={{ background: `linear-gradient(135deg, ${gradStart}, ${gradEnd})`, boxShadow: `0 8px 24px ${gradEnd}66` }}>
+                                            <Icons.Download /> Görseli İndir
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {modal.type === 'update_email' && (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <button onClick={() => openModal('settings_profile')} className="p-2 -ml-2 text-gray-400 dark:text-slate-400 hover:text-gray-600 transition"><Icons.ChevronLeft /></button>
+                                    <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">E-posta Güncelle</h2>
+                                </div>
+                                <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">Yeni e-posta adresinizi girin:</p>
+                                <input
+                                    type="email"
+                                    placeholder="Yeni E-posta"
+                                    className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 outline-none focus:bg-white focus:border focus:border-indigo-200 transition"
+                                    value={form.email || ''}
+                                    onChange={e => setForm({ ...form, email: e.target.value })}
+                                />
+                                <div className="flex gap-2 pt-2">
+                                    <button onClick={() => openModal('settings_profile')} className="flex-1 py-3 rounded-xl font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition">İptal</button>
+                                    <button onClick={() => {
+                                        if (!form.email) return;
+                                        auth.currentUser.verifyBeforeUpdateEmail(form.email)
+                                            .then(() => {
+                                                // Sync email to Realtime Database
+                                                db.ref('users/' + auth.currentUser.uid + '/profile/email').set(form.email);
+                                                alert("Yeni e-posta adresinize bir doğrulama bağlantısı gönderildi. Lütfen gelen kutunuzu kontrol edip onaylayın. Onayladıktan sonra e-postanız değişecektir.");
+                                                openModal('settings_profile');
+                                            })
+                                            .catch(error => {
+                                                if (error.code === 'auth/requires-recent-login') {
+                                                    alert("Güvenlik nedeniyle bu işlemi yapabilmek için yakın zamanda giriş yapmış olmanız gerekir. Lütfen çıkış yapıp hesabınıza tekrar giriş yapın ve tekrar deneyin.");
+                                                } else {
+                                                    alert("Hata: " + error.message);
+                                                }
+                                            });
+                                    }} className="flex-1 py-3 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">Güncelle</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {modal.type === 'update_password' && (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <button onClick={() => openModal('settings_profile')} className="p-2 -ml-2 text-gray-400 dark:text-slate-400 hover:text-gray-600 transition"><Icons.ChevronLeft /></button>
+                                    <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Şifre Güncelle</h2>
+                                </div>
+                                <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">Yeni şifrenizi girin (en az 6 karakter):</p>
+                                <input
+                                    type="password"
+                                    placeholder="Yeni Şifre"
+                                    className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 outline-none focus:bg-white focus:border focus:border-indigo-200 transition"
+                                    value={form.password || ''}
+                                    onChange={e => setForm({ ...form, password: e.target.value })}
+                                />
+                                <div className="flex gap-2 pt-2">
+                                    <button onClick={() => openModal('settings_profile')} className="flex-1 py-3 rounded-xl font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition">İptal</button>
+                                    <button onClick={() => {
+                                        if (!form.password) return;
+                                        auth.currentUser.updatePassword(form.password)
+                                            .then(() => {
+                                                alert("Şifreniz başarıyla güncellendi!");
+                                                openModal('settings_profile');
+                                            })
+                                            .catch(error => {
+                                                if (error.code === 'auth/requires-recent-login') {
+                                                    alert("Güvenlik nedeniyle bu işlemi yapabilmek için yakın zamanda giriş yapmış olmanız gerekir. Lütfen çıkış yapıp hesabınıza tekrar giriş yapın ve tekrar deneyin.");
+                                                } else {
+                                                    alert("Hata: " + error.message);
+                                                }
+                                            });
+                                    }} className="flex-1 py-3 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">Güncelle</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {modal.type === 'settings_messages' && (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <button onClick={() => openModal('settings')} className="p-2 -ml-2 text-gray-400 dark:text-slate-400 hover:text-gray-600 transition"><Icons.ChevronLeft /></button>
+                                    <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Mentordan Mesajlar</h2>
+                                </div>
+
+                                <div className="space-y-3 max-h-[500px] overflow-y-auto no-scrollbar">
+                                    {(!profile?.mentorMessages || profile.mentorMessages.length === 0) ? (
+                                        <div className="text-center py-10 text-gray-400 dark:text-slate-400">
+                                            <div className="text-4xl mb-3 opacity-50">📬</div>
+                                            <p className="font-medium">Henüz mentordan bir mesaj almadın.</p>
+                                        </div>
+                                    ) : (
+                                        profile.mentorMessages.slice(0, 5).map((msg, index) => (
+                                            <div key={msg.id || index} className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 p-4 rounded-2xl shadow-sm hover:border-indigo-100 transition relative overflow-hidden group">
+                                                <div className="absolute top-0 left-0 w-1 h-full bg-indigo-400"></div>
+                                                <div className="flex justify-between items-start mb-2 pl-2">
+                                                    <div className="font-bold text-gray-800 dark:text-slate-100 flex items-center gap-2">
+                                                        {msg.title || 'Mentorun Mesajı'}
+                                                    </div>
+                                                    <div className="text-xs text-gray-400 dark:text-slate-400 font-medium whitespace-nowrap">
+                                                        {new Date(msg.timestamp).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                                                    </div>
+                                                </div>
+                                                <p className="text-gray-600 text-sm mb-3 pl-2 leading-relaxed">
+                                                    {msg.message}
+                                                </p>
+                                                {msg.gold > 0 && (
+                                                    <div className="pl-2">
+                                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-xs font-bold border border-amber-100">
+                                                            🪙 +{msg.gold} Altın
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {modal.type === 'settings_routines' && (
+                            <div className="space-y-6">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <button onClick={() => openModal('settings')} className="p-2 -ml-2 text-gray-400 dark:text-slate-400 hover:text-gray-600 transition"><Icons.ChevronLeft /></button>
+                                    <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Gunluk Rutinler Ayarlari</h2>
+                                </div>
+
+                                <div className="bg-orange-50 p-6 rounded-3xl border border-orange-100 text-center">
+                                    <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">🌅</div>
+                                    <h3 className="text-lg font-bold text-orange-900 mb-1">Yeni Bir Alışkanlık</h3>
+                                    <p className="text-orange-700/70 text-sm mb-4">Küçük adımlar büyük değişimler yaratır.</p>
+
+                                    <div className="flex gap-2">
+                                        <input placeholder="✨" className="w-12 p-3 rounded-xl border border-orange-200 text-center text-xl outline-none focus:ring-2 ring-orange-400"
+                                            value={form.icon || ''} onChange={e => setForm({ ...form, icon: e.target.value })} />
+                                        <input placeholder="Örn: 10 Sayfa Kitap Oku" className="flex-1 w-full max-w-[200px] p-3 rounded-xl border border-orange-200 text-sm focus:ring-2 ring-orange-400 outline-none"
+                                            value={form.title || ''} onChange={e => setForm({ ...form, title: e.target.value })} />
+                                        <button onClick={() => { if (form.title) { addHabit(); setForm({ title: '', icon: '' }); } }} className="bg-orange-500 hover:bg-orange-600 text-white p-3 rounded-xl font-bold transition shadow-lg shadow-orange-200 shrink-0">
+                                            <Icons.Plus />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3 max-h-[400px] overflow-y-auto no-scrollbar">
+                                    <h3 className="font-bold text-gray-800 dark:text-slate-100 px-2 mt-4">Mevcut Rutinlerin</h3>
+                                    {habits.map(h => (
+                                        <div key={h.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-gray-100 dark:border-slate-700 flex items-center justify-between group">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-700 flex items-center justify-center text-xl">{h.icon}</div>
+                                                <div className="font-bold text-gray-800 dark:text-slate-100">{h.title}</div>
+                                            </div>
+                                            <button onClick={() => deleteHabit(h.id)} className="text-gray-300 hover:text-red-500 p-2 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                                                <Icons.Trash />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {habits.length === 0 && <div className="text-center text-gray-400 dark:text-slate-400 py-4 text-sm">Listede henüz alışkanlık yok.</div>}
+                                </div>
+                            </div>
+                        )}
+
+                        {modal.type === 'journal' && (
+                            <div className="space-y-4">
+                                <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Bugünkü Düşüncelerin</h2>
+                                <div className="flex justify-between text-3xl">
+                                    {['😣', '🙁', '😐', '🙂', '🤩'].map(m => (
+                                        <button key={m} onClick={() => setForm({ ...form, mood: m })} className={`p-2 rounded-xl transition ${form.mood === m ? 'bg-indigo-100 scale-110' : 'hover:bg-gray-100'}`}>{m}</button>
+                                    ))}
+                                </div>
+                                <textarea placeholder="Bugün nasıl geçti?" rows="4" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl text-gray-700 outline-none font-medium resize-none" value={form.note || ''} onChange={e => setForm({ ...form, note: e.target.value })}></textarea>
+                                <button onClick={() => { updateCloud(`history/${dateKey}/journal`, { mood: form.mood, note: form.note }); closeModal(); }} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold">Kaydet</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {showTimeline && activeTab === 'calendar' && calendarMode === 'day' && (() => {
+                const timelineTasks = (currentDayData.tasks || []).filter(t => t.startTime && t.startTime.trim() !== '');
+                const colors = [
+                    { bg: 'rgba(99,102,241,0.15)', border: '#6366f1', text: '#4338ca' },
+                    { bg: 'rgba(16,185,129,0.15)', border: '#10b981', text: '#065f46' },
+                    { bg: 'rgba(245,158,11,0.15)', border: '#f59e0b', text: '#92400e' },
+                    { bg: 'rgba(239,68,68,0.15)', border: '#ef4444', text: '#991b1b' },
+                    { bg: 'rgba(139,92,246,0.15)', border: '#8b5cf6', text: '#5b21b6' },
+                ];
+                const darkColors = [
+                    { bg: 'rgba(99,102,241,0.25)', border: '#818cf8', text: '#c7d2fe' },
+                    { bg: 'rgba(16,185,129,0.25)', border: '#34d399', text: '#a7f3d0' },
+                    { bg: 'rgba(245,158,11,0.25)', border: '#fbbf24', text: '#fde68a' },
+                    { bg: 'rgba(239,68,68,0.25)', border: '#f87171', text: '#fecaca' },
+                    { bg: 'rgba(139,92,246,0.25)', border: '#a78bfa', text: '#ddd6fe' },
+                ];
+                return (
+                    <div className="absolute inset-0 z-40 bg-white dark:bg-slate-900 flex flex-col" style={{ top: 0 }}>
+                        {/* HEADER */}
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-900 flex-shrink-0">
+                            <button onClick={() => setShowTimeline(false)} className="flex items-center gap-1 text-indigo-500 font-bold text-sm">
+                                <Icons.ChevronLeft /> Geri
+                            </button>
+                            <div className="text-center">
+                                <div className="text-xs font-bold text-gray-400 dark:text-slate-400 uppercase tracking-wider">Günün Akışı</div>
+                                <div className="text-sm font-black text-gray-800 dark:text-slate-100">{getDayName(selectedDate)}</div>
+                            </div>
+                            <div className="w-16" />
+                        </div>
+
+                        {/* HOUR GRID */}
+                        <div className="flex-1 overflow-y-auto relative" style={{ scrollbarWidth: 'none' }}>
+                            <div className="relative" style={{ height: `${24 * 60}px` }}>
+                                {/* Hour lines */}
+                                {Array.from({ length: 24 }, (_, h) => (
+                                    <div key={h} className="absolute left-0 right-0 flex items-start" style={{ top: `${h * 60}px`, height: '60px' }}>
+                                        <span className="text-[10px] font-bold text-gray-300 dark:text-slate-600 w-12 text-right pr-2 pt-0.5 select-none flex-shrink-0">
+                                            {String(h).padStart(2, '0')}:00
+                                        </span>
+                                        <div className="flex-1 border-t border-gray-100 dark:border-slate-700/60 mt-2" />
+                                    </div>
+                                ))}
+
+                                {/* Task blocks */}
+                                {timelineTasks.map((t, idx) => {
+                                    const [hStr, mStr] = t.startTime.split(':');
+                                    const h = parseInt(hStr, 10) || 0;
+                                    const m = parseInt(mStr, 10) || 0;
+                                    const topPx = h * 60 + m;
+                                    const heightPx = Math.max(30, Number(t.duration) || 30);
+                                    const colLight = colors[idx % colors.length];
+                                    const colDark = darkColors[idx % darkColors.length];
+                                    return (
+                                        <div
+                                            key={t.id}
+                                            className="absolute overflow-hidden rounded-r-lg"
+                                            style={{
+                                                top: `${topPx}px`,
+                                                left: '52px',
+                                                right: '12px',
+                                                height: `${heightPx}px`,
+                                                backgroundColor: isDarkMode ? colDark.bg : colLight.bg,
+                                                borderLeft: `3px solid ${isDarkMode ? colDark.border : colLight.border}`,
+                                            }}
+                                        >
+                                            <div className="px-2 pt-1 overflow-hidden h-full">
+                                                <div className="font-bold text-[11px] leading-tight truncate" style={{ color: isDarkMode ? colDark.text : colLight.text }}>
+                                                    {t.title}
+                                                </div>
+                                                {heightPx >= 40 && (
+                                                    <div className="text-[10px] opacity-70 font-medium" style={{ color: isDarkMode ? colDark.text : colLight.text }}>
+                                                        {t.startTime} · {t.duration} dk
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+
+                                {timelineTasks.length === 0 && (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 pointer-events-none">
+                                        <span className="text-4xl">📅</span>
+                                        <p className="text-gray-400 dark:text-slate-500 text-sm font-bold">Zamanlanmış görev yok</p>
+                                        <p className="text-gray-300 dark:text-slate-600 text-xs">+butonuna basıp yeni görev ekle .Görev eklerken başlangıç saati gir</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {focusMode.active && (
+                <div className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center text-white p-8 animate-fade-in">
+                    <div className="text-2xl font-bold mb-8 opacity-50">{focusMode.taskTitle}</div>
+                    <div className="text-8xl font-black font-mono tracking-tighter mb-12">
+                        {Math.floor(focusMode.timeLeft / 60)}:{(focusMode.timeLeft % 60).toString().padStart(2, '0')}
+                    </div>
+                    <div className="flex gap-4">
+                        <button onClick={() => setFocusMode({ ...focusMode, isRunning: !focusMode.isRunning })} className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center text-3xl backdrop-blur-md border border-white/20">
+                            {focusMode.isRunning ? <Icons.Pause /> : <Icons.Play />}
+                        </button>
+                        <button onClick={handleStopFocus} className="w-20 h-20 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center text-3xl backdrop-blur-md border border-red-500/50">
+                            <Icons.Stop />
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* MENTOR BİLDİRİM MODALI */}
+            {notificationModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-fade-in">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-w-sm w-full p-6 text-center transform transition-all">
+                        <div className="text-5xl mb-4">
+                            {notificationModal.type === 'celebrate' ? '🎉' : '💪'}
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-slate-100 mb-2">{notificationModal.title}</h3>
+                        <p className="text-gray-600 mb-4 leading-relaxed">{notificationModal.message}</p>
+                        {notificationModal.gold > 0 && (
+                            <div className="inline-flex items-center gap-2 bg-amber-50 text-amber-700 px-4 py-2 rounded-full font-bold text-sm mb-4 border border-amber-200">
+                                🪙 +{notificationModal.gold} Altın Kazanıldı!
+                            </div>
+                        )}
+                        <button
+                            onClick={closeNotification}
+                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition shadow-lg shadow-indigo-200 mt-2"
+                        >
+                            Harika! ✨
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
