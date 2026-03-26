@@ -15,6 +15,7 @@ const MentorDashboard = ({ currentUser }) => {
     const [classDetailModal, setClassDetailModal] = useState(null); // { id, name }
     const [addStudentModal, setAddStudentModal] = useState(false);
     const [selectedStudentsToAdd, setSelectedStudentsToAdd] = useState([]);
+    const [expandedList, setExpandedList] = useState(null); // 'radar' | 'ghost' | null
 
     const ConfirmationModal = () => {
         if (!confirmModal.open) return null;
@@ -989,7 +990,7 @@ const MentorDashboard = ({ currentUser }) => {
                                     <div className="h-1 bg-gradient-to-r from-orange-400 to-amber-500"></div>
                                     <div className="p-4">
                                         <h3 className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">📉 Radardakiler</h3>
-                                        {radarStudents.length > 0 ? radarStudents.slice(0, 5).map(s => {
+                                        {radarStudents.length > 0 ? radarStudents.slice(0, 3).map(s => {
                                             const focusMin = getFocusMinutesForDays(s, 3);
                                             return (
                                                 <div key={s.uid} onClick={() => setSelectedStudent(s)} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer transition mb-1">
@@ -1008,6 +1009,16 @@ const MentorDashboard = ({ currentUser }) => {
                                                 </div>
                                             );
                                         }) : <div className="text-xs text-gray-400 dark:text-slate-500 text-center py-4">Radarda kimse yok 🎉</div>}
+                                        {radarStudents.length > 3 && (
+                                            <div className="flex justify-center mt-2">
+                                                <button
+                                                    onClick={() => setExpandedList('radar')}
+                                                    className="text-[11px] font-bold text-orange-500 dark:text-orange-400 hover:text-orange-600 dark:hover:text-orange-300 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/40 px-3 py-1 rounded-full transition"
+                                                >
+                                                    Tümünü Gör ({radarStudents.length})
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -1016,7 +1027,7 @@ const MentorDashboard = ({ currentUser }) => {
                                     <div className="h-1 bg-gradient-to-r from-red-400 to-rose-500"></div>
                                     <div className="p-4">
                                         <h3 className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">👻 Hayaletler</h3>
-                                        {ghostStudents.length > 0 ? ghostStudents.slice(0, 5).map(s => (
+                                        {ghostStudents.length > 0 ? ghostStudents.slice(0, 3).map(s => (
                                             <div key={s.uid} onClick={() => setSelectedStudent(s)} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer transition mb-1">
                                                 <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-700 flex items-center justify-center font-bold text-gray-400 dark:text-slate-500 text-xs">
                                                     {s.profile.name.charAt(0)}
@@ -1028,9 +1039,95 @@ const MentorDashboard = ({ currentUser }) => {
                                                 <span>{s.diffDays >= 7 ? '🔴' : '🟡'}</span>
                                             </div>
                                         )) : <div className="text-xs text-gray-400 dark:text-slate-500 text-center py-4">Kayıp öğrenci yok 🎉</div>}
+                                        {ghostStudents.length > 3 && (
+                                            <div className="flex justify-center mt-2">
+                                                <button
+                                                    onClick={() => setExpandedList('ghost')}
+                                                    className="text-[11px] font-bold text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 px-3 py-1 rounded-full transition"
+                                                >
+                                                    Tümünü Gör ({ghostStudents.length})
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
+
+                            {/* DRILL-DOWN MODAL */}
+                            {expandedList && (
+                                <div
+                                    className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+                                    style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)' }}
+                                    onClick={() => setExpandedList(null)}
+                                >
+                                    <div
+                                        className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col border border-gray-100 dark:border-slate-700 animate-fade-in"
+                                        onClick={e => e.stopPropagation()}
+                                    >
+                                        {/* Modal Header */}
+                                        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-700">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-lg">{expandedList === 'radar' ? '📉' : '👻'}</span>
+                                                <div>
+                                                    <h3 className="text-base font-extrabold text-gray-900 dark:text-slate-100">
+                                                        {expandedList === 'radar' ? 'Radardakiler' : 'Hayaletler'}
+                                                    </h3>
+                                                    <p className="text-[11px] text-gray-400 dark:text-slate-400">
+                                                        {expandedList === 'radar' ? `${radarStudents.length} öğrenci` : `${ghostStudents.length} öğrenci`}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => setExpandedList(null)}
+                                                className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 text-xl font-bold transition"
+                                            >&times;</button>
+                                        </div>
+
+                                        {/* Modal List */}
+                                        <div className="flex-1 overflow-y-auto p-4 space-y-1">
+                                            {expandedList === 'radar' && radarStudents.map(s => {
+                                                const focusMin = getFocusMinutesForDays(s, 3);
+                                                return (
+                                                    <div
+                                                        key={s.uid}
+                                                        onClick={() => { setSelectedStudent(s); setExpandedList(null); }}
+                                                        className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-orange-50 dark:hover:bg-slate-700 cursor-pointer transition"
+                                                    >
+                                                        <div className="w-9 h-9 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center font-bold text-orange-600 dark:text-orange-400 text-sm flex-shrink-0">
+                                                            {s.profile.name.charAt(0)}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="font-bold text-sm text-gray-800 dark:text-slate-100 truncate">{s.profile.name}</div>
+                                                            <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
+                                                                <span className="text-[10px] text-orange-500 font-bold">⏱️ {focusMin}dk/3gün</span>
+                                                                {getStudentStreak(s) > 0 && <span className="text-[10px] text-orange-600 font-bold">🔥 {getStudentStreak(s)}gün</span>}
+                                                                <span className="text-[10px] text-gray-400 dark:text-slate-500">👁️ {timeAgo(s.profile.lastSeen)}</span>
+                                                            </div>
+                                                        </div>
+                                                        <span className="text-orange-400 text-xs">⚠️</span>
+                                                    </div>
+                                                );
+                                            })}
+                                            {expandedList === 'ghost' && ghostStudents.map(s => (
+                                                <div
+                                                    key={s.uid}
+                                                    onClick={() => { setSelectedStudent(s); setExpandedList(null); }}
+                                                    className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer transition"
+                                                >
+                                                    <div className="w-9 h-9 rounded-full bg-gray-100 dark:bg-slate-700 flex items-center justify-center font-bold text-gray-400 dark:text-slate-500 text-sm flex-shrink-0">
+                                                        {s.profile.name.charAt(0)}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="font-bold text-sm text-gray-800 dark:text-slate-100 truncate">{s.profile.name}</div>
+                                                        <div className="text-[10px] text-gray-400 dark:text-slate-500 font-bold">{s.diffDays >= 999 ? 'Hiç giriş yok' : `${s.diffDays} gündür kayıp`}</div>
+                                                    </div>
+                                                    <span>{s.diffDays >= 7 ? '🔴' : '🟡'}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </>
                     )}
                 </div>
@@ -1042,6 +1139,15 @@ const MentorDashboard = ({ currentUser }) => {
 const AnalysisView = ({ student }) => {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [dateOffset, setDateOffset] = useState(0);
+    const [liveHistory, setLiveHistory] = useState(student.history || {});
+
+    useEffect(() => {
+        const ref = db.ref(`users/${student.uid}/history`);
+        ref.on('value', (snap) => {
+            setLiveHistory(snap.val() || {});
+        });
+        return () => ref.off();
+    }, [student.uid]);
 
     const getDateKey = (date) => {
         const year = date.getFullYear();
@@ -1059,7 +1165,9 @@ const AnalysisView = ({ student }) => {
     };
 
     const selectedDateKey = getDateKey(selectedDate);
-    const selectedDayData = (student.history && student.history[selectedDateKey]) || { tasks: [], habits: [] };
+    const selectedDayData = liveHistory[selectedDateKey] || { tasks: [], habits: [] };
+    // Pass liveHistory into student-derived lookups as well
+    const liveStudent = { ...student, history: liveHistory };
     const daysList = getPaginatedDays();
 
     return (
@@ -1078,7 +1186,7 @@ const AnalysisView = ({ student }) => {
                 <div className="grid grid-cols-10 gap-1 mb-2 px-1">
                     {daysList.map((d, i) => {
                         const k = getDateKey(d);
-                        const mood = student.history && student.history[k] && student.history[k].journal ? student.history[k].journal.mood : '•';
+                        const mood = liveHistory[k] && liveHistory[k].journal ? liveHistory[k].journal.mood : '•';
                         return <div key={i} className="text-center text-xs opacity-50 grayscale">{mood}</div>
                     })}
                 </div>
@@ -1086,7 +1194,7 @@ const AnalysisView = ({ student }) => {
                 <div className="grid grid-cols-10 gap-1 sm:gap-2">
                     {daysList.map((d, i) => {
                         const k = getDateKey(d);
-                        const dayData = student.history && student.history[k];
+                        const dayData = liveHistory[k];
                         let pct = 0;
                         let hasTasks = false;
                         if (dayData && dayData.tasks && dayData.tasks.length > 0) {
@@ -1151,8 +1259,9 @@ const AnalysisView = ({ student }) => {
                 <h4 className="text-xs font-bold text-gray-400 dark:text-slate-400 border-b pb-2 mb-3">GÖREV GÜNLÜĞÜ</h4>
                 {selectedDayData.tasks && selectedDayData.tasks.length > 0 ? (
                     <div className="space-y-2">
-                        {selectedDayData.tasks.filter(t => t.completed || (t.subItems && t.subItems.some(Boolean))).map((t, idx) => {
+                        {selectedDayData.tasks.map((t, idx) => {
                             const isPartial = !t.completed && t.subItems && t.subItems.some(Boolean);
+                            const isPending = !t.completed && !(t.subItems && t.subItems.some(Boolean));
                             let progressText = "";
                             let displayDuration = t.duration;
                             let percent = 0;
@@ -1167,23 +1276,49 @@ const AnalysisView = ({ student }) => {
                                 percent = (done / total) * 100;
                             }
 
-                            // Use Global Logic
-                            const status = getStatusInfo(percent, true);
+                            // Pending (0%) tasks: use neutral gray style
+                            const status = isPending
+                                ? { color: '#f3f4f6', textColor: '#9ca3af' }
+                                : getStatusInfo(percent, true);
+
+                            const fmtTs = (ts) => new Date(ts).toLocaleString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 
                             return (
                                 <div key={idx}
-                                    className="flex justify-between items-center p-3 rounded-lg transition"
+                                    className="flex justify-between items-start p-3 rounded-lg transition"
                                     style={{
                                         backgroundColor: status.color,
                                         color: status.textColor
                                     }}
                                 >
-                                    <span className="text-sm font-medium">
-                                        {t.isMentorTask && '🛡️ '}
-                                        {t.title}
-                                        {isPartial && <span className="text-xs font-bold opacity-75 ml-1">{progressText}</span>}
-                                    </span>
-                                    <span className="text-xs font-bold">{displayDuration}dk</span>
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className="text-sm font-medium">
+                                            {t.title}
+                                            {isPartial && <span className="text-xs font-bold opacity-75 ml-1">{progressText}</span>}
+                                            {isPending && <span className="text-[10px] font-bold opacity-50 ml-1">(bekliyor)</span>}
+                                        </span>
+                                        {t.isMentorTask && (
+                                            <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300 px-1.5 py-0.5 rounded self-start">
+                                                👨‍🏫 MENTOR GÖREVİ
+                                            </span>
+                                        )}
+                                        <div className="flex flex-wrap gap-2 mt-0.5">
+                                            {t.createdAt && (
+                                                <span className="text-[10px] opacity-60">
+                                                    🕒 Eklendi: {fmtTs(t.createdAt)}
+                                                </span>
+                                            )}
+                                            {t.createdAt && t.lastActivityAt && (
+                                                <span className="text-[10px] opacity-40">|</span>
+                                            )}
+                                            {t.lastActivityAt && (
+                                                <span className="text-[10px] opacity-60">
+                                                    ✍️ Son İşlem: {fmtTs(t.lastActivityAt)}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <span className="text-xs font-bold flex-shrink-0">{displayDuration}dk</span>
                                 </div>
                             );
                         })}
@@ -1199,7 +1334,7 @@ const AnalysisView = ({ student }) => {
                 <div className="mt-4 space-y-3 pl-4 border-l-2 border-gray-100 dark:border-slate-700">
                     {daysList.map((d, i) => {
                         const k = getDateKey(d);
-                        const hist = student.history && student.history[k];
+                        const hist = liveHistory[k];
                         if (!hist || !hist.tasks || hist.tasks.length === 0) return null;
 
                         return (
@@ -1377,7 +1512,7 @@ const StudentSimulator = ({ studentId }) => {
     const handleAddTask = (type) => {
         let newTask;
         if (type === 'simple') {
-            newTask = { id: Date.now(), title: form.title, type: 'simple', completed: false, duration: form.time || '30', startTime: form.startTime || '' };
+            newTask = { id: Date.now(), title: form.title, type: 'simple', completed: false, duration: form.time || '30', startTime: form.startTime || '', createdAt: Date.now() };
         } else if (type === 'import') {
             const p = modal.data || projects.find(pro => String(pro.id).replace("ID_", "") === String(form.projectId).replace("ID_", ""));
             if (!p) return alert("Lütfen bir proje seçin!");
@@ -1392,7 +1527,7 @@ const StudentSimulator = ({ studentId }) => {
             newTask = {
                 id: Date.now(), title: `${p.title} (${amount} ${p.unit})`, type: 'project_slice',
                 pid: p.id, targetAmount: amount, subItems: new Array(amount).fill(false), completed: false,
-                duration: String(calculatedDuration), startTime: form.startTime || ''
+                duration: String(calculatedDuration), startTime: form.startTime || '', createdAt: Date.now()
             };
         }
         const newTasks = [...(currentDayData.tasks || []), newTask];
@@ -1405,7 +1540,7 @@ const StudentSimulator = ({ studentId }) => {
         if (!task) return;
         const newStatus = !task.completed;
         db.ref(`users/${student.uid}/gold`).set((gold || 0) + (newStatus ? 10 : -10));
-        const updatedTasks = currentDayData.tasks.map(t => t.id === taskId ? { ...t, completed: newStatus } : t);
+        const updatedTasks = currentDayData.tasks.map(t => t.id === taskId ? { ...t, completed: newStatus, lastActivityAt: Date.now() } : t);
         updateCloud(`history/${dateKey}/tasks`, updatedTasks);
     };
 
@@ -1427,15 +1562,15 @@ const StudentSimulator = ({ studentId }) => {
         const allDone = newSubItems.every(i => i === true);
         db.ref(`users/${student.uid}/gold`).set((gold || 0) + (wasDone ? -5 : 5));
         const updatedTasks = currentDayData.tasks.map(t => {
-            if (t.id === taskId) return { ...t, subItems: newSubItems, completed: allDone };
+            if (t.id === taskId) return { ...t, subItems: newSubItems, completed: allDone, lastActivityAt: Date.now() };
             return t;
         });
         updateCloud(`history/${dateKey}/tasks`, updatedTasks);
     };
 
     const deleteTask = (id) => {
+        // Mentor mode: always allow deletion (override any lock)
         const tasks = currentDayData.tasks || [];
-        // Mentor can always delete in simulator
         updateCloud(`history/${dateKey}/tasks`, tasks.filter(t => t.id !== id));
     };
 
@@ -1501,6 +1636,7 @@ const StudentSimulator = ({ studentId }) => {
                     todayKey={todayKey}
                     currentDayData={currentDayData}
                     updateCloud={updateCloud}
+                    isMentorMode={true}
                 />
             </div>
         </div>
@@ -1510,6 +1646,66 @@ const StudentSimulator = ({ studentId }) => {
 const StudentDetailModal = ({ student, classes, onClose }) => {
     const [activeTab, setActiveTab] = useState('analysis');
     const [form, setForm] = useState({});
+    const [newNote, setNewNote] = useState('');
+    const [noteDate, setNoteDate] = useState(new Date().toISOString().split('T')[0]);
+    const [mentorNotes, setMentorNotes] = useState([]);
+    const [editingNoteId, setEditingNoteId] = useState(null);
+    const [editingNoteText, setEditingNoteText] = useState('');
+    const [globalTags, setGlobalTags] = useState({ topics: [], sources: [], types: [] });
+
+    useEffect(() => {
+        const tagsRef = db.ref('globalTags');
+        tagsRef.on('value', (snap) => {
+            if (snap.exists()) {
+                const data = snap.val();
+                setGlobalTags({
+                    topics: data.topics || [],
+                    sources: data.sources || [],
+                    types: data.types || []
+                });
+            } else {
+                setGlobalTags({ topics: [], sources: [], types: [] });
+            }
+        });
+        return () => tagsRef.off();
+    }, []);
+
+    useEffect(() => {
+        const ref = db.ref(`users/${student.uid}/mentorNotes`);
+        ref.on('value', (snap) => {
+            const val = snap.val();
+            if (val) {
+                const arr = Object.entries(val)
+                    .map(([id, n]) => ({ id, ...n }))
+                    .sort((a, b) => b.date - a.date);
+                setMentorNotes(arr);
+            } else {
+                setMentorNotes([]);
+            }
+        });
+        return () => ref.off();
+    }, [student.uid]);
+
+    const handleSaveNote = () => {
+        if (!newNote.trim()) return;
+        const dateTs = noteDate ? new Date(noteDate).setHours(12, 0, 0, 0) : Date.now();
+        db.ref(`users/${student.uid}/mentorNotes`).push({ date: dateTs, text: newNote.trim() });
+        setNewNote('');
+        setNoteDate(new Date().toISOString().split('T')[0]);
+    };
+
+    const handleDeleteNote = (id) => {
+        if (confirm('Bu notu silmek istediğine emin misin?')) {
+            db.ref(`users/${student.uid}/mentorNotes/${id}`).remove();
+        }
+    };
+
+    const handleSaveEdit = (id) => {
+        if (!editingNoteText.trim()) return;
+        db.ref(`users/${student.uid}/mentorNotes/${id}/text`).set(editingNoteText.trim());
+        setEditingNoteId(null);
+        setEditingNoteText('');
+    };
 
     const getDateKey = (date) => {
         const year = date.getFullYear();
@@ -1527,24 +1723,66 @@ const StudentDetailModal = ({ student, classes, onClose }) => {
         setForm({ ...form }); // Force render
     };
 
+    const processGlobalTags = (topic, source, type) => {
+        let newTopic = topic?.trim();
+        let newSource = source?.trim();
+        let newType = type?.trim();
+
+        const updates = {};
+        if (newTopic && !globalTags.topics.includes(newTopic)) updates.topics = [...globalTags.topics, newTopic];
+        if (newSource && !globalTags.sources.includes(newSource)) updates.sources = [...globalTags.sources, newSource];
+        if (newType && !globalTags.types.includes(newType)) updates.types = [...globalTags.types, newType];
+
+        if (Object.keys(updates).length > 0) {
+            db.ref('globalTags').set({ ...globalTags, ...updates });
+        }
+    };
+
     const handleAssignTask = () => {
-        if (!form.title) return;
-        // Use selected date from input OR today if not present
+        if (!form.topic && !form.title) return; // Allow either topic or title based on new format, form.title is fallback
         const targetK = form.assignDate ? form.assignDate : getDateKey(new Date());
+
+        let finalTitle = '';
+        if (form.title) {
+            finalTitle = form.title;
+        } else if (form.topic && form.source) {
+            finalTitle = `${form.topic} - ${form.source}`;
+        } else if (form.topic) {
+            finalTitle = form.topic;
+        } else if (form.source) {
+            finalTitle = form.source;
+        }
+
+        // If amount is provided alongside unit (default to 'Birim')
+        const amountSuffix = form.amount ? ` (${form.amount} ${form.unit || 'Birim'})` : '';
+        const displayTitle = finalTitle + amountSuffix;
 
         const newTask = {
             id: Date.now(),
-            title: form.title,
+            title: displayTitle,
             duration: form.duration || '30',
-            type: 'simple',
+            type: form.projectId ? 'project_slice' : 'simple',
             completed: false,
             isMentorTask: true,
-            allowDelete: form.allowDelete === true // Explicitly save permissions
+            allowDelete: form.allowDelete === true,
+            addedBy: 'mentor',
+            topic: form.topic || null,
+            source: form.source || null,
+            typeStr: form.taskType || null
         };
+        
+        if (form.projectId) {
+            newTask.pid = form.projectId;
+            newTask.targetAmount = Number(form.amount) || 1;
+            newTask.subItems = new Array(newTask.targetAmount).fill(false);
+        }
 
         const currentTasks = (student.history && student.history[targetK] && student.history[targetK].tasks) || [];
         db.ref(`users/${student.uid}/history/${targetK}/tasks`).set([...currentTasks, newTask]);
-        setForm({ ...form, title: '', duration: '' });
+        
+        processGlobalTags(form.topic, form.source, form.taskType);
+
+        setForm({ ...form, title: '', topic: '', source: '', taskType: '', duration: '', amount: '', unit: '', projectId: '' });
         alert(`${targetK} tarihine görev atandı!`);
     };
 
@@ -1612,10 +1850,10 @@ const StudentDetailModal = ({ student, classes, onClose }) => {
                         </select>
                     </div>
                 </div>
-                <div className="flex bg-gray-100 p-1 rounded-lg">
-                    {['analysis', 'panel', 'management', 'interaction'].map(t => (
-                        <button key={t} onClick={() => setActiveTab(t)} className={`px-3 sm:px-4 py-2 rounded-md text-[10px] sm:text-xs font-bold transition uppercase ${activeTab === t ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600' : 'text-gray-400 dark:text-slate-400'}`}>
-                            {t === 'analysis' ? 'Analiz' : t === 'panel' ? 'Panel' : t === 'management' ? 'Yönetim' : 'Etkileşim'}
+                <div className="flex bg-gray-100 p-1 rounded-lg overflow-x-auto">
+                    {['analysis', 'panel', 'management', 'interaction', 'notes'].map(t => (
+                        <button key={t} onClick={() => setActiveTab(t)} className={`px-3 sm:px-4 py-2 rounded-md text-[10px] sm:text-xs font-bold transition uppercase whitespace-nowrap ${activeTab === t ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600' : 'text-gray-400 dark:text-slate-400'}`}>
+                            {t === 'analysis' ? 'Analiz' : t === 'panel' ? 'Panel' : t === 'management' ? 'Yönetim' : t === 'interaction' ? 'Etkileşim' : '📝 Notlar'}
                         </button>
                     ))}
                 </div>
@@ -1638,10 +1876,84 @@ const StudentDetailModal = ({ student, classes, onClose }) => {
                             <h3 className="font-bold text-gray-800 dark:text-slate-100 mb-1">🛡️ Zorunlu Görev Ata</h3>
                             <p className="text-xs text-gray-400 dark:text-slate-400 mb-4">Öğrencinin gününe görev ekle.</p>
                             <div className="space-y-3">
-                                <input className="w-full bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-sm" placeholder="Görev Başlığı" value={form.title || ''} onChange={e => setForm({ ...form, title: e.target.value })} />
-                                <div className="flex gap-2">
-                                    <input type="number" className="flex-1 bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-sm" placeholder="Süre (dk)" value={form.duration || ''} onChange={e => setForm({ ...form, duration: e.target.value })} />
-                                    <input type="date" className="flex-1 bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-sm" value={form.assignDate || ''} onChange={e => setForm({ ...form, assignDate: e.target.value })} />
+                                <div className="space-y-3">
+                                    {/* Proje Seçimi */}
+                                    <div className="relative">
+                                        <select 
+                                            className="w-full bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-sm font-bold text-gray-700 dark:text-slate-200 outline-none border border-transparent appearance-none"
+                                            value={form.projectId || ''} 
+                                            onChange={e => {
+                                                const pid = e.target.value;
+                                                setForm({ ...form, projectId: pid, topic: '', source: '', taskType: '', amount: '', unit: 'Sayfa' });
+                                            }}
+                                        >
+                                            <option value="">Öğrencinin Hedeflerinden Seç (Opsiyonel)</option>
+                                            {(student.projects || []).map(p => (
+                                                <option key={p.id} value={p.id}>{p.title}</option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 text-xs">▼</div>
+                                    </div>
+                                    
+                                    {/* Görev Başlığı Input (Açıkça İstendi) */}
+                                    <input className="w-full bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-sm" placeholder="Görev Başlığı (Opsiyonel: Detaylı Belirtmek İstersen)" value={form.title || ''} onChange={e => setForm({ ...form, title: e.target.value })} />
+
+                                    {/* Dinamik Konu Ağacı / Serbest Girdi */}
+                                    {(() => {
+                                        const selectedP = (student.projects || []).find(p => String(p.id) === String(form.projectId));
+                                        const pItems = selectedP?.projectItems ? (Array.isArray(selectedP.projectItems) ? selectedP.projectItems : Object.values(selectedP.projectItems)) : [];
+                                        
+                                        if (selectedP && pItems.length > 0) {
+                                            return (
+                                                <div className="relative">
+                                                    <select 
+                                                        className="w-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 p-3 rounded-xl text-sm font-bold outline-none border border-indigo-100 dark:border-indigo-500/30 appearance-none"
+                                                        value={form.topic || ''}
+                                                        onChange={e => {
+                                                            const item = pItems.find(i => String(i.id) === e.target.value);
+                                                            if (item) {
+                                                                setForm({ ...form, topic: item.topic || '', source: item.source || '', taskType: item.type || '', amount: item.amount || '', unit: item.unit || selectedP.unit || '' });
+                                                            } else {
+                                                                setForm({ ...form, topic: '', source: '', taskType: '' });
+                                                            }
+                                                        }}
+                                                    >
+                                                        <option value="">Ağaçtan Konu / Kaynak Seçin</option>
+                                                        {pItems.map(item => (
+                                                            <option key={item.id} value={item.id}>
+                                                                {[item.topic, item.source].filter(Boolean).join(' - ')} ({item.amount} {item.unit || selectedP.unit})
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-indigo-400 text-xs">▼</div>
+                                                </div>
+                                            );
+                                        }
+
+                                        // Serbest Girdi Tasarımı
+                                        return (
+                                            <div className="space-y-2">
+                                                <input list="ms-topics" className="w-full bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-sm font-semibold text-gray-700 dark:text-slate-100 outline-none border border-gray-100 dark:border-slate-600 focus:border-indigo-300" placeholder="Konu (Örn: Matematik)" value={form.topic || ''} onChange={e => setForm({ ...form, topic: e.target.value })} />
+                                                <div className="flex gap-2">
+                                                    <input list="ms-sources" className="flex-1 bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-sm font-semibold text-gray-700 dark:text-slate-100 outline-none border border-gray-100 dark:border-slate-600 focus:border-indigo-300" placeholder="Kaynak (Opsiyonel)" value={form.source || ''} onChange={e => setForm({ ...form, source: e.target.value })} />
+                                                    <input list="ms-types" className="flex-1 bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-sm font-semibold text-gray-700 dark:text-slate-100 outline-none border border-gray-100 dark:border-slate-600 focus:border-indigo-300" placeholder="Tip (Örn: Test)" value={form.taskType || ''} onChange={e => setForm({ ...form, taskType: e.target.value })} />
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <input type="number" className="flex-1 bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-sm font-semibold text-gray-700 dark:text-slate-100 outline-none border border-gray-100 dark:border-slate-600 focus:border-indigo-300" placeholder="Miktar" value={form.amount || ''} onChange={e => setForm({ ...form, amount: e.target.value })} />
+                                                    <input className="flex-1 bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-sm font-semibold text-gray-700 dark:text-slate-100 outline-none border border-gray-100 dark:border-slate-600 focus:border-indigo-300" placeholder="Birim" value={form.unit || ''} onChange={e => setForm({ ...form, unit: e.target.value })} />
+                                                </div>
+                                                <datalist id="ms-topics">{(globalTags?.topics || []).map(t => <option key={t} value={t} />)}</datalist>
+                                                <datalist id="ms-sources">{(globalTags?.sources || []).map(s => <option key={s} value={s} />)}</datalist>
+                                                <datalist id="ms-types">{(globalTags?.types || []).map(t => <option key={t} value={t} />)}</datalist>
+                                            </div>
+                                        );
+                                    })()}
+                                    
+                                </div>
+
+                                <div className="flex gap-2 mt-3">
+                                    <input type="number" className="flex-1 bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-sm font-semibold" placeholder="Tahmini Süre (dk)" value={form.duration || ''} onChange={e => setForm({ ...form, duration: e.target.value })} />
+                                    <input type="date" className="flex-1 bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-sm font-semibold" value={form.assignDate || ''} title="Tarih" onChange={e => setForm({ ...form, assignDate: e.target.value })} />
                                 </div>
 
                                 {/* Allow Delete Toggle */}
@@ -1708,7 +2020,88 @@ const StudentDetailModal = ({ student, classes, onClose }) => {
                             <input type="number" placeholder="Altın Miktarı (Opsiyonel)" className="w-full bg-gray-50 dark:bg-slate-700 p-3 rounded-xl border border-gray-200 dark:border-slate-700" value={form.goldAmount || ''} onChange={e => setForm({ ...form, goldAmount: e.target.value })} />
                             <button onClick={() => handleInteraction('custom')} className="w-full border-2 border-dashed border-gray-300 text-gray-400 dark:text-slate-400 py-3 rounded-xl font-bold hover:border-gray-400 hover:text-gray-600">Özel Mesaj Gönder</button>
                         </div>
+                    </div>
+                )}
 
+                {activeTab === 'notes' && (
+                    <div className="space-y-4 max-w-2xl mx-auto">
+                        {/* Not Ekleme Kutusu */}
+                        <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700">
+                            <h3 className="font-bold text-gray-700 dark:text-slate-200 text-sm mb-3">📝 Yeni Not Ekle</h3>
+                            <textarea
+                                className="w-full bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl p-3 text-sm text-gray-800 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+                                rows={4}
+                                placeholder="Öğrenciyle yapılan görüşme detayları, psikolojik durumu veya hedefleri..."
+                                value={newNote}
+                                onChange={e => setNewNote(e.target.value)}
+                            />
+                            <div className="flex items-center gap-3 mt-3">
+                                <div className="flex items-center gap-2 flex-1">
+                                    <label className="text-xs font-bold text-gray-400 dark:text-slate-400 whitespace-nowrap">🗓️ Tarih:</label>
+                                    <input
+                                        type="date"
+                                        className="flex-1 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg px-2 py-1.5 text-xs text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                        value={noteDate}
+                                        onChange={e => setNoteDate(e.target.value)}
+                                    />
+                                </div>
+                                <button
+                                    onClick={handleSaveNote}
+                                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition shadow-sm"
+                                >Notu Kaydet</button>
+                            </div>
+                        </div>
+
+                        {/* Not Listesi */}
+                        {mentorNotes.length === 0 ? (
+                            <div className="text-center py-12 text-gray-300 dark:text-slate-600">
+                                <div className="text-4xl mb-2">📋</div>
+                                <div className="text-sm font-medium">Henüz not eklenmemiş.</div>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {mentorNotes.map(note => (
+                                    <div key={note.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
+                                        <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-gray-50 dark:border-slate-700">
+                                            <span className="text-[11px] text-gray-400 dark:text-slate-500 font-medium">
+                                                🗓️ {new Date(note.date).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                            <div className="flex gap-1">
+                                                <button
+                                                    onClick={() => { setEditingNoteId(note.id); setEditingNoteText(note.text); }}
+                                                    className="p-1.5 text-gray-300 hover:text-indigo-500 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition"
+                                                    title="Düzenle"
+                                                >📝</button>
+                                                <button
+                                                    onClick={() => handleDeleteNote(note.id)}
+                                                    className="p-1.5 text-gray-300 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition"
+                                                    title="Sil"
+                                                >🗑️</button>
+                                            </div>
+                                        </div>
+                                        <div className="px-4 py-3">
+                                            {editingNoteId === note.id ? (
+                                                <div className="space-y-2">
+                                                    <textarea
+                                                        className="w-full bg-gray-50 dark:bg-slate-700 border border-indigo-300 dark:border-indigo-500 rounded-xl p-3 text-sm text-gray-800 dark:text-slate-100 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+                                                        rows={3}
+                                                        value={editingNoteText}
+                                                        onChange={e => setEditingNoteText(e.target.value)}
+                                                        autoFocus
+                                                    />
+                                                    <div className="flex gap-2 justify-end">
+                                                        <button onClick={() => setEditingNoteId(null)} className="px-3 py-1.5 text-xs font-bold text-gray-400 hover:text-gray-600 rounded-lg border border-gray-200 dark:border-slate-600 transition">İptal</button>
+                                                        <button onClick={() => handleSaveEdit(note.id)} className="px-4 py-1.5 text-xs font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">Kaydet</button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{note.text}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

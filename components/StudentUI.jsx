@@ -973,7 +973,8 @@ const StudentUI = ({
     addHabit, deleteHabit, toggleHabit,
     handlePurchase, handleStartFocus, handleStopFocus,
     handleAddReward, handleDeleteReward,
-    dateKey, todayKey, currentDayData, updateCloud, streakFreeze
+    dateKey, todayKey, currentDayData, updateCloud, streakFreeze,
+    isMentorMode, globalTags
 }) => {
     const localFlippedProjects = flippedProjects || {};
     const [calendarMode, setCalendarMode] = React.useState('day');
@@ -1332,7 +1333,10 @@ const StudentUI = ({
                                 <div className="flex flex-col gap-2 w-full">
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <div className={`font-bold text-sm text-gray-800 dark:text-slate-100 ${t.completed ? 'line-through' : ''}`}>{t.title}</div>
+                                            <div className={`font-bold text-sm text-gray-800 dark:text-slate-100 ${t.completed ? 'line-through' : ''}`}>
+                                                {t.title}
+                                                {t.isMentorTask && <span className="ml-2 text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 px-1.5 py-0.5 rounded">👨‍🏫 MENTOR</span>}
+                                            </div>
                                             <div className="text-xs text-gray-400 dark:text-slate-400 mt-0.5">{t.duration} dk • {t.targetAmount} adet</div>
                                         </div>
                                         <div className="flex items-center gap-1">
@@ -1341,7 +1345,9 @@ const StudentUI = ({
                                                     <Icons.Play />
                                                 </button>
                                             )}
-                                            <button onClick={() => deleteTask(t.id)} className="text-gray-300 hover:text-red-500 p-1"><Icons.Trash /></button>
+                                            {!(t.isMentorTask && t.allowDelete === false && !isMentorMode) && (
+                                                <button onClick={() => deleteTask(t.id)} className="text-gray-300 hover:text-red-500 p-1"><Icons.Trash /></button>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="flex flex-wrap gap-2">
@@ -1359,7 +1365,10 @@ const StudentUI = ({
                                         {t.completed && <Icons.Check stroke="white" />}
                                     </button>
                                     <div className="flex-1">
-                                        <div className={`font-bold text-sm text-gray-800 dark:text-slate-100 ${t.completed ? 'line-through' : ''}`}>{t.title}</div>
+                                        <div className={`font-bold text-sm text-gray-800 dark:text-slate-100 ${t.completed ? 'line-through' : ''}`}>
+                                            {t.title}
+                                            {t.isMentorTask && <span className="ml-2 text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 px-1.5 py-0.5 rounded">👨‍🏫 MENTOR</span>}
+                                        </div>
                                         <div className="text-xs text-gray-400 dark:text-slate-400 mt-0.5">{t.duration} dk</div>
                                     </div>
                                     {!t.completed && (
@@ -1367,7 +1376,9 @@ const StudentUI = ({
                                             <Icons.Play />
                                         </button>
                                     )}
-                                    <button onClick={() => deleteTask(t.id)} className="p-2 text-gray-300 hover:text-red-500"><Icons.Trash /></button>
+                                    {!(t.isMentorTask && t.allowDelete === false && !isMentorMode) && (
+                                        <button onClick={() => deleteTask(t.id)} className="p-2 text-gray-300 hover:text-red-500"><Icons.Trash /></button>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -1855,7 +1866,7 @@ const StudentUI = ({
             {modal.open && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in backdrop-blur-sm">
                     <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-sm p-6 shadow-2xl relative">
-                        <button onClick={closeModal} className="absolute top-4 right-4 text-gray-400 dark:text-slate-400 hover:text-gray-600"><Icons.Close /></button>
+                        <button onClick={() => { localStorage.setItem('pulseShown_' + todayKey, 'true'); closeModal(); }} className="absolute top-4 right-4 text-gray-400 dark:text-slate-400 hover:text-gray-600"><Icons.Close /></button>
 
                         {modal.type === 'templates' && (
                             <div className="space-y-4">
@@ -2046,6 +2057,36 @@ const StudentUI = ({
                                             <h3 className="text-indigo-600 font-bold text-lg">{projects.find(p => String(p.id) === String(form.projectId))?.title}</h3>
                                         </div>
 
+                                        {(() => {
+                                            const p = projects.find(pr => String(pr.id) === String(form.projectId));
+                                            const items = p?.projectItems ? (Array.isArray(p.projectItems) ? p.projectItems : Object.values(p.projectItems)) : [];
+                                            if (items && items.length > 0) {
+                                                return (
+                                                    <div className="mb-6 text-left">
+                                                        <label className="text-xs font-bold text-gray-500 mb-2 block pl-2 dark:text-slate-400">Hangi Konudan / Kaynaktan?</label>
+                                                        <div className="relative">
+                                                            <select
+                                                                className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-200 outline-none border border-gray-100 dark:border-slate-600 focus:border-indigo-300 focus:bg-white transition appearance-none cursor-pointer pr-10"
+                                                                value={form.selectedProjectItemId || ''}
+                                                                onChange={(e) => setForm({ ...form, selectedProjectItemId: e.target.value })}
+                                                            >
+                                                                <option value="">Ağaç Geneli (Serbest Miktar)</option>
+                                                                {items.map(item => (
+                                                                    <option key={item.id} value={item.id}>
+                                                                        {[item.topic, item.source].filter(Boolean).join(' - ') || 'Konu/Kaynak'} (Kalan: {item.amount || 0} {item.unit || p.unit})
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 dark:text-slate-400 text-xs">
+                                                                ▼
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
+
                                         <div className="flex items-center justify-center gap-4 mb-6">
                                             <div className="flex items-center bg-gray-50 dark:bg-slate-700 rounded-2xl p-2 border border-gray-100 dark:border-slate-700">
                                                 <input type="number" className="w-16 bg-transparent text-center font-bold text-2xl outline-none text-gray-800 dark:text-slate-100" value={form.amount || ''} onChange={e => {
@@ -2102,10 +2143,73 @@ const StudentUI = ({
                                     );
                                 })()}
                                 <input placeholder="Hedef Adı (örn: Matematik)" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.title !== undefined ? form.title : (modal.data?.title ?? '')} onChange={e => setForm({ ...form, title: e.target.value })} />
-                                <div className="grid grid-cols-2 gap-2">
-                                    <input type="number" placeholder="Toplam" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.total !== undefined ? form.total : (modal.data?.totalUnit ?? '')} onChange={e => setForm({ ...form, total: e.target.value })} />
-                                    <input placeholder="Birim (Soru, Sayfa)" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.unit !== undefined ? form.unit : (modal.data?.unit ?? '')} onChange={e => setForm({ ...form, unit: e.target.value })} />
+                                
+                                <div className="flex gap-2">
+                                    <input type="number" placeholder="Ana Toplam Hedef (Örn: 400)" className="flex-1 p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.total !== undefined ? form.total : (modal.data?.totalUnit ?? '')} onChange={e => setForm({ ...form, total: e.target.value })} />
+                                    <input placeholder="Ana Birim (Örn: Sayfa)" className="w-1/3 p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.unit !== undefined ? form.unit : (modal.data?.unit ?? '')} onChange={e => setForm({ ...form, unit: e.target.value })} />
                                 </div>
+
+                                <div className="bg-gray-50 dark:bg-slate-700/50 p-4 rounded-xl space-y-3 border border-gray-100 dark:border-slate-600">
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="font-bold text-sm text-gray-600 dark:text-slate-300">Konu / Kaynak Ağacı</h3>
+                                    </div>
+                                    
+                                    {(form.projectItems || []).map((item, idx) => (
+                                        <div key={item.id} className="flex flex-col gap-2 bg-white dark:bg-slate-700 p-3 rounded-lg border border-gray-100 dark:border-slate-600 shadow-sm relative">
+                                            <div className="flex gap-2">
+                                                <input list="topics-list" placeholder="Konu" className="flex-1 min-w-0 p-2 bg-gray-50 dark:bg-slate-800 rounded border border-gray-100 dark:border-slate-600 text-xs font-semibold text-gray-700 dark:text-slate-200 outline-none focus:border-indigo-300" 
+                                                       value={item.topic || ''} onChange={(e) => {
+                                                           const newItems = [...form.projectItems];
+                                                           newItems[idx].topic = e.target.value;
+                                                           setForm({ ...form, projectItems: newItems });
+                                                       }} />
+                                                <input list="sources-list" placeholder="Kaynak" className="flex-1 min-w-0 p-2 bg-gray-50 dark:bg-slate-800 rounded border border-gray-100 dark:border-slate-600 text-xs font-semibold text-gray-700 dark:text-slate-200 outline-none focus:border-indigo-300"
+                                                       value={item.source || ''} onChange={(e) => {
+                                                           const newItems = [...form.projectItems];
+                                                           newItems[idx].source = e.target.value;
+                                                           setForm({ ...form, projectItems: newItems });
+                                                       }} />
+                                            </div>
+                                            <div className="flex gap-2 items-center">
+                                                <input list="types-list" placeholder="Tip (örn: Test)" className="flex-1 min-w-0 p-2 bg-gray-50 dark:bg-slate-800 rounded border border-gray-100 dark:border-slate-600 text-xs font-semibold text-gray-700 dark:text-slate-200 outline-none focus:border-indigo-300"
+                                                       value={item.type || ''} onChange={(e) => {
+                                                           const newItems = [...form.projectItems];
+                                                           newItems[idx].type = e.target.value;
+                                                           setForm({ ...form, projectItems: newItems });
+                                                       }} />
+                                                <input type="number" placeholder="Miktar" className="w-16 p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded border border-indigo-100 dark:border-indigo-500/50 text-xs font-bold outline-none text-center"
+                                                       value={item.amount || ''} onChange={(e) => {
+                                                           const newItems = [...form.projectItems];
+                                                           newItems[idx].amount = e.target.value;
+                                                           setForm({ ...form, projectItems: newItems });
+                                                       }} />
+                                                <input placeholder="Birim" className="w-16 p-2 bg-gray-50 dark:bg-slate-800 rounded border border-gray-100 dark:border-slate-600 text-xs text-gray-500 dark:text-slate-400 outline-none"
+                                                       value={item.unit || ''} onChange={(e) => {
+                                                           const newItems = [...form.projectItems];
+                                                           newItems[idx].unit = e.target.value;
+                                                           setForm({ ...form, projectItems: newItems });
+                                                       }} />
+                                                <button onClick={() => {
+                                                    const newItems = form.projectItems.filter((_, i) => i !== idx);
+                                                    setForm({ ...form, projectItems: newItems });
+                                                }} className="p-1.5 min-w-[32px] flex justify-center text-red-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition focus:outline-none">
+                                                    🗑️
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    
+                                    <button onClick={() => {
+                                        const newItems = [...(form.projectItems || []), { id: Date.now(), topic: '', source: '', type: '', amount: 0, unit: 'Sayfa' }];
+                                        setForm({ ...form, projectItems: newItems });
+                                    }} className="w-full border-2 border-dashed border-indigo-200 dark:border-indigo-500/30 text-indigo-500 dark:text-indigo-400 font-bold text-sm py-3 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition">
+                                        + Alt Konu / Kaynak Ekle
+                                    </button>
+                                </div>
+                                
+                                <datalist id="topics-list">{(globalTags?.topics || []).map(t => <option key={t} value={t} />)}</datalist>
+                                <datalist id="sources-list">{(globalTags?.sources || []).map(s => <option key={s} value={s} />)}</datalist>
+                                <datalist id="types-list">{(globalTags?.types || []).map(t => <option key={t} value={t} />)}</datalist>
                                 <input type="number" placeholder="Şu anki Durum" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.current !== undefined ? form.current : (modal.data?.currentUnit ?? '')} onChange={e => setForm({ ...form, current: e.target.value })} />
                                 <input type="number" placeholder="Tahmini Toplam Saat" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.estTime !== undefined ? form.estTime : (modal.data?.totalEstTime ?? '')} onChange={e => setForm({ ...form, estTime: e.target.value })} />
 
@@ -2586,7 +2690,7 @@ const StudentUI = ({
                                     ))}
                                 </div>
                                 <textarea placeholder="Bugün nasıl geçti?" rows="4" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl text-gray-700 outline-none font-medium resize-none" value={form.note || ''} onChange={e => setForm({ ...form, note: e.target.value })}></textarea>
-                                <button onClick={() => { updateCloud(`history/${dateKey}/journal`, { mood: form.mood, note: form.note }); closeModal(); }} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold">Kaydet</button>
+                                <button onClick={() => { updateCloud(`history/${dateKey}/journal`, { mood: form.mood, note: form.note }); localStorage.setItem('pulseShown_' + todayKey, 'true'); closeModal(); }} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold">Kaydet</button>
                             </div>
                         )}
                     </div>

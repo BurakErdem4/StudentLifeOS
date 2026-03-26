@@ -1155,6 +1155,25 @@
             const [form, setForm] = useState({});
             const [notificationModal, setNotificationModal] = useState(null);
             const [dataAccordionOpen, setDataAccordionOpen] = useState(false);
+            const [globalTags, setGlobalTags] = useState({ topics: [], sources: [], types: [] });
+
+            // Global Tags Listener
+            useEffect(() => {
+                const tagsRef = db.ref('globalTags');
+                tagsRef.on('value', (snap) => {
+                    if (snap.exists()) {
+                        const data = snap.val();
+                        setGlobalTags({
+                            topics: data.topics || [],
+                            sources: data.sources || [],
+                            types: data.types || []
+                        });
+                    } else {
+                        setGlobalTags({ topics: [], sources: [], types: [] });
+                    }
+                });
+                return () => tagsRef.off();
+            }, []);
 
 
             // Global maintenance mode listener (Firebase → tüm istemcilerde gerçek zamanlı)
@@ -1350,7 +1369,7 @@
             const handleAddTask = (type) => {
                 let newTask;
                 if (type === 'simple') {
-                    newTask = { id: Date.now(), title: form.title, type: 'simple', completed: false, duration: form.time || '30', startTime: form.startTime || '' };
+                    newTask = { id: Date.now(), title: form.title, type: 'simple', completed: false, duration: form.time || '30', startTime: form.startTime || '', createdAt: Date.now() };
                 } else if (type === 'import') {
                     const p = modal.data || projects.find(pro => String(pro.id).replace("ID_", "") === String(form.projectId).replace("ID_", ""));
                     if (!p) return alert("Lütfen bir proje seçin!");
@@ -1362,11 +1381,30 @@
                         calculatedDuration = Math.round(totalHours * 60);
                     }
                     if (!calculatedDuration) calculatedDuration = '60';
+                    
+                    let selectedTopic = null;
+                    if (form.selectedProjectItemId && p.projectItems) {
+                        const items = Array.isArray(p.projectItems) ? p.projectItems : Object.values(p.projectItems);
+                        selectedTopic = items.find(i => String(i.id) === String(form.selectedProjectItemId));
+                    }
+                    
+                    const itemUnit = selectedTopic?.unit || p.unit;
+                    const itemTitleSuffix = selectedTopic 
+                        ? ` - ${[selectedTopic.topic, selectedTopic.source].filter(Boolean).join(' ')} (${amount} ${itemUnit})` 
+                        : ` (${amount} ${itemUnit})`;
+
                     newTask = {
-                        id: Date.now(), title: `${p.title} (${amount} ${p.unit})`, type: 'project_slice',
+                        id: Date.now(), title: `${p.title}${itemTitleSuffix}`, type: 'project_slice',
                         pid: p.id, targetAmount: amount, subItems: new Array(amount).fill(false), completed: false,
-                        duration: String(calculatedDuration), startTime: form.startTime || ''
+                        duration: String(calculatedDuration), startTime: form.startTime || '', createdAt: Date.now()
                     };
+                    
+                    if (selectedTopic) {
+                        newTask.topic = selectedTopic.topic || null;
+                        newTask.source = selectedTopic.source || null;
+                        newTask.typeStr = selectedTopic.type || null;
+                        newTask.projectItemId = selectedTopic.id || null;
+                    }
                 }
                 const newTasks = [...(currentDayData.tasks || []), newTask];
                 updateCloud(`history/${dateKey}/tasks`, newTasks);
@@ -1377,7 +1415,7 @@
                 const task = currentDayData.tasks.find(t => t.id === taskId);
                 const newStatus = !task.completed;
                 updateGold(newStatus ? 10 : -10);
-                const updatedTasks = currentDayData.tasks.map(t => t.id === taskId ? { ...t, completed: newStatus } : t);
+                const updatedTasks = currentDayData.tasks.map(t => t.id === taskId ? { ...t, completed: newStatus, lastActivityAt: Date.now() } : t);
                 updateCloud(`history/${dateKey}/tasks`, updatedTasks);
             };
 
@@ -1398,7 +1436,7 @@
                 const allDone = newSubItems.every(i => i === true);
                 updateGold(wasDone ? -5 : 5);
                 const updatedTasks = currentDayData.tasks.map(t => {
-                    if (t.id === taskId) return { ...t, subItems: newSubItems, completed: allDone };
+                    if (t.id === taskId) return { ...t, subItems: newSubItems, completed: allDone, lastActivityAt: Date.now() };
                     return t;
                 });
                 updateCloud(`history/${dateKey}/tasks`, updatedTasks);
@@ -1423,9 +1461,36 @@
             const deleteHabit = (id) => updateCloud('habits', habits.filter(h => h.id !== id));
             const addHabit = () => { if (form.title) { updateCloud('habits', [...habits, { id: Date.now(), title: form.title, icon: form.icon || '✨' }]); setForm({ title: '', icon: '' }); } };
 
+            const processGlobalTags = (items) => {
+                const newTopics = new Set();
+                const newSources = new Set();
+                const newTypes = new Set();
+                
+                (items || []).forEach(item => {
+                    const topic = item.topic?.trim();
+                    const source = item.source?.trim();
+                    const type = item.type?.trim();
+                    
+                    if (topic && !globalTags.topics.includes(topic)) newTopics.add(topic);
+                    if (source && !globalTags.sources.includes(source)) newSources.add(source);
+                    if (type && !globalTags.types.includes(type)) newTypes.add(type);
+                });
+                
+                if (newTopics.size > 0 || newSources.size > 0 || newTypes.size > 0) {
+                    const updates = {};
+                    if (newTopics.size > 0) updates.topics = [...globalTags.topics, ...newTopics];
+                    if (newSources.size > 0) updates.sources = [...globalTags.sources, ...newSources];
+                    if (newTypes.size > 0) updates.types = [...globalTags.types, ...newTypes];
+                    updateCloud('globalTags', { ...globalTags, ...updates });
+                }
+            };
+
             const handleAddProject = () => {
                 if (form.title) {
                     const initial = Number(form.initial) || 0;
+                    const items = form.projectItems || [];
+                    const mainUnit = form.unit || items[0]?.unit || 'br';
+
                     updateCloud('projects', [...projects, {
                         id: Date.now(),
                         title: form.title,
@@ -1433,9 +1498,11 @@
                         totalUnit: Number(form.total) || 100,
                         currentUnit: initial, // Start with initial unit
                         initialUnit: initial, // Store initial unit for analytics
-                        unit: form.unit || 'br',
-                        totalEstTime: Number(form.estTime) || 0
+                        unit: mainUnit,
+                        totalEstTime: Number(form.estTime) || 0,
+                        projectItems: items
                     }]);
+                    processGlobalTags(items);
                     closeModal();
                 }
             };
@@ -1443,7 +1510,8 @@
                 const p = modal.data;
                 if (!p) return;
                 const newTitle = form.title !== undefined ? form.title : p.title;
-                const newTotal = form.total !== undefined && form.total !== '' ? Number(form.total) : Number(p.totalUnit) || 100;
+                const items = form.projectItems || p.projectItems || [];
+                const newTotal = form.total !== undefined ? Number(form.total) : (Number(p.totalUnit) || 100);
                 const newUnit = form.unit !== undefined ? form.unit : (p.unit || 'br');
                 const newEstTime = form.estTime !== undefined && form.estTime !== '' ? Number(form.estTime) : Number(p.totalEstTime) || 0;
                 const newCurrent = form.current !== undefined && form.current !== '' ? Number(form.current) : Number(p.currentUnit) || 0;
@@ -1466,17 +1534,67 @@
                     unit: newUnit,
                     totalEstTime: newEstTime,
                     currentUnit: newCurrent,
-                    initialUnit: newInitial
+                    initialUnit: newInitial,
+                    projectItems: items
                 } : proj);
 
                 updateCloud('projects', updatedProjects);
+                processGlobalTags(items);
                 closeModal();
             };
             const handleBuyReward = (r) => { if (gold >= r.cost && confirm(`${r.icon || '🎁'} "${r.title}" — ${r.cost} altın`)) updateGold(-r.cost); };
             const handleAddReward = () => { if (form.title) { updateCloud('rewards', [...rewards, { id: Date.now(), title: form.title, cost: Number(form.cost), icon: form.icon || '🎁' }]); closeModal(); } };
             const handleDeleteReward = (id) => { if (confirm('Silmek istediğine emin misin?')) updateCloud('rewards', rewards.filter(r => r.id !== id)); };
-            const closeModal = () => setModal({ open: false, type: null, data: null });
-            const openModal = (type, data = null) => { setModal({ open: true, type, data }); setForm({}); if (type === 'journal') { setForm({ mood: currentDayData.journal?.mood || '😐', note: currentDayData.journal?.note || '' }); } };
+            const journalAutoOpened = React.useRef(false);
+
+            const closeModal = () => {
+                // When journal modal is dismissed (X or Save), lock it for this session + day
+                if (modal.type === 'journal') {
+                    journalAutoOpened.current = true;
+                    localStorage.setItem('pulseShown_' + todayKey, 'true');
+                }
+                setModal({ open: false, type: null, data: null });
+            };
+            const openModal = (type, data = null) => { 
+                setModal({ open: true, type, data }); 
+                let newForm = {};
+                if (type === 'journal') { 
+                    newForm = { mood: currentDayData.journal?.mood || '😐', note: currentDayData.journal?.note || '' }; 
+                } else if (type === 'project') {
+                    let pItems = data?.projectItems ? (Array.isArray(data.projectItems) ? [...data.projectItems] : Object.values(data.projectItems)) : [];
+                    // Fallback backward compatibility for old format projects
+                    if (!data?.projectItems && data?.title) {
+                        pItems = [{ id: Date.now(), topic: data.title, source: '', type: '', amount: Number(data.totalUnit) || 0, unit: data.unit || 'Sayfa' }];
+                    } else if (pItems.length === 0) {
+                        pItems = [{ id: Date.now(), topic: '', source: '', type: '', amount: 0, unit: 'Sayfa' }];
+                    }
+                    newForm = { ...data, projectItems: pItems };
+                }
+                setForm(newForm); 
+            };
+
+            // Auto-open journal modal ONCE per session+day
+            useEffect(() => {
+                if (!todayKey || !user) return;
+                // Session guard: if we've already triggered this session, never again
+                if (journalAutoOpened.current) return;
+                // Persistence guard: if localStorage says shown today, lock ref and stop
+                if (localStorage.getItem('pulseShown_' + todayKey)) {
+                    journalAutoOpened.current = true;
+                    return;
+                }
+                // Data guard: if journal already has content, mark and stop
+                const alreadyFilled = !!(currentDayData?.journal?.mood || currentDayData?.journal?.note);
+                if (alreadyFilled) {
+                    journalAutoOpened.current = true;
+                    localStorage.setItem('pulseShown_' + todayKey, 'true');
+                    return;
+                }
+                // Lock immediately so no parallel timer can be created
+                journalAutoOpened.current = true;
+                const t = setTimeout(() => { openModal('journal'); }, 1500);
+                return () => clearTimeout(t);
+            }, [todayKey, user, currentDayData?.journal?.mood, currentDayData?.journal?.note]);
 
             if (loadingUser) return <div className="h-full flex items-center justify-center bg-gray-900 text-white">Yükleniyor...</div>;
             if (!user) return <AuthScreen />;
@@ -1591,6 +1709,7 @@
                         </div>
                     )}
                     <StudentUI
+                        globalTags={globalTags}
                         user={user} profile={profile || {}} activeTab={activeTab} setActiveTab={setActiveTab}
                         selectedDate={selectedDate} setSelectedDate={setSelectedDate}
                         projects={projects} history={history} habits={habits} rewards={rewards}
@@ -1598,7 +1717,7 @@
                         flippedProjects={flippedProjects} setFlippedProjects={setFlippedProjects}
                         focusMode={focusMode} setFocusMode={setFocusMode}
                         modal={modal}
-                        openModal={(type, data) => { setModal({ open: true, type, data }); setForm({}); if (type === 'journal') { setForm({ mood: currentDayData.journal?.mood || '😐', note: currentDayData.journal?.note || '' }); } }}
+                        openModal={openModal}
                         closeModal={() => setModal({ open: false, type: null, data: null })}
                         form={form} setForm={setForm}
                         notificationModal={notificationModal} closeNotification={closeNotification}
