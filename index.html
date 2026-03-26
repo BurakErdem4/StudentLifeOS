@@ -1562,12 +1562,6 @@
                     newForm = { mood: currentDayData.journal?.mood || '😐', note: currentDayData.journal?.note || '' }; 
                 } else if (type === 'project') {
                     let pItems = data?.projectItems ? (Array.isArray(data.projectItems) ? [...data.projectItems] : Object.values(data.projectItems)) : [];
-                    // Fallback backward compatibility for old format projects
-                    if (!data?.projectItems && data?.title) {
-                        pItems = [{ id: Date.now(), topic: data.title, source: '', type: '', amount: Number(data.totalUnit) || 0, unit: data.unit || 'Sayfa' }];
-                    } else if (pItems.length === 0) {
-                        pItems = [{ id: Date.now(), topic: '', source: '', type: '', amount: 0, unit: 'Sayfa' }];
-                    }
                     newForm = { ...data, projectItems: pItems };
                 }
                 setForm(newForm); 

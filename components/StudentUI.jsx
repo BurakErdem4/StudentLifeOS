@@ -1010,6 +1010,7 @@ const StudentUI = ({
 
     const studentData = {
         id: user.uid,
+        uid: user.uid,
         projects: projects || [],
         history: history || {}
     };
@@ -1865,7 +1866,7 @@ const StudentUI = ({
 
             {modal.open && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-sm p-6 shadow-2xl relative">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-sm p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto no-scrollbar">
                         <button onClick={() => { localStorage.setItem('pulseShown_' + todayKey, 'true'); closeModal(); }} className="absolute top-4 right-4 text-gray-400 dark:text-slate-400 hover:text-gray-600"><Icons.Close /></button>
 
                         {modal.type === 'templates' && (
@@ -2108,16 +2109,17 @@ const StudentUI = ({
                                             <input type="number" className="flex-1 bg-transparent font-bold text-gray-800 dark:text-slate-100 outline-none text-right" value={form.time || ''} onChange={e => setForm({ ...form, time: e.target.value })} placeholder="Otomatik" />
                                         </div>
 
-                                        <div className="flex items-center gap-2 bg-gray-50 dark:bg-slate-700 p-3 rounded-xl mb-6">
-                                            <span className="text-gray-400 dark:text-slate-400 text-sm font-bold">🕐 Başlangıç:</span>
-                                            <input
-                                                type="time"
-                                                className="flex-1 bg-transparent font-bold text-gray-700 dark:text-slate-100 outline-none text-right"
-                                                value={form.startTime || ''}
-                                                onChange={e => setForm({ ...form, startTime: e.target.value })}
-                                                title="Başlangıç Saati (İsteğe Bağlı)"
-                                            />
-                                            {!form.startTime && <span className="text-[10px] text-gray-400 font-normal">opsiyonel</span>}
+                                        <div className="flex gap-2 mb-6">
+                                            <div className="flex-1 relative">
+                                                <input
+                                                    type="time"
+                                                    className="w-full p-3 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-600 dark:text-slate-100 outline-none border border-transparent focus:border-indigo-200"
+                                                    value={form.startTime || ''}
+                                                    onChange={e => setForm({ ...form, startTime: e.target.value })}
+                                                    title="Başlangıç Saati (İsteğe Bağlı)"
+                                                />
+                                                {!form.startTime && <span className="absolute top-1/2 -translate-y-1/2 left-3 text-[10px] text-gray-400 pointer-events-none font-normal">Saat (opsiyonel)</span>}
+                                            </div>
                                         </div>
 
                                         <button onClick={() => handleAddTask('import')} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">
@@ -2809,7 +2811,7 @@ const StudentUI = ({
             {/* MENTOR BİLDİRİM MODALI */}
             {notificationModal && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-fade-in">
-                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-w-sm w-full p-6 text-center transform transition-all">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-w-sm w-full p-6 text-center transform transition-all max-h-[90vh] overflow-y-auto no-scrollbar">
                         <div className="text-5xl mb-4">
                             {notificationModal.type === 'celebrate' ? '🎉' : '💪'}
                         </div>
