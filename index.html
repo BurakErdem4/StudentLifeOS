@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>mylifeOS v5.17 - Cloud Edition</title>
+    <title>ogrenciOS v5.17 </title>
 
     <!-- React & Tailwind -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -259,7 +259,7 @@
             return (
                 <div className="flex flex-col items-center justify-center h-full bg-gray-900 text-white p-6">
                     <div className="w-full max-w-sm bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-700">
-                        <h1 className="text-3xl font-thin tracking-widest text-center mb-2">mylifeOS</h1>
+                        <h1 className="text-3xl font-thin tracking-widest text-center mb-2">ogrenciOS</h1>
                         <p className="text-gray-400 dark:text-slate-400 text-center text-xs tracking-wide mb-8">CLOUD EDITION</p>
 
                         <form onSubmit={handleAuth} className="space-y-4">
@@ -1360,13 +1360,13 @@
                 return () => clearInterval(interval);
             }, [focusMode]);
 
-            const updateCloud = (path, value) => { 
-                if (!user) return; 
+            const updateCloud = (path, value) => {
+                if (!user) return;
                 try {
                     // KESİN ÇÖZÜM: Firebase "undefined" değerleri kabul etmez ve anında kodu çökertir (Silent Crash).
                     // Objelerin içindeki olası 'undefined' değerleri güvenle temizlemek için deep-copy yapıyoruz.
                     const cleanValue = JSON.parse(JSON.stringify(value));
-                    db.ref(`users/${user.uid}/${path}`).set(cleanValue); 
+                    db.ref(`users/${user.uid}/${path}`).set(cleanValue);
                 } catch (e) {
                     console.error("Firebase Sync Error:", e);
                 }
@@ -1391,16 +1391,16 @@
                         calculatedDuration = Math.round(totalHours * 60);
                     }
                     if (!calculatedDuration) calculatedDuration = '60';
-                    
+
                     let selectedTopic = null;
                     if (form.selectedProjectItemId && p.projectItems) {
                         const items = Array.isArray(p.projectItems) ? p.projectItems : Object.values(p.projectItems);
                         selectedTopic = items.find(i => String(i.id) === String(form.selectedProjectItemId));
                     }
-                    
+
                     const itemUnit = selectedTopic?.unit || p.unit;
-                    const itemTitleSuffix = selectedTopic 
-                        ? ` - ${[selectedTopic.topic, selectedTopic.source].filter(Boolean).join(' ')} (${amount} ${itemUnit})` 
+                    const itemTitleSuffix = selectedTopic
+                        ? ` - ${[selectedTopic.topic, selectedTopic.source].filter(Boolean).join(' ')} (${amount} ${itemUnit})`
                         : ` (${amount} ${itemUnit})`;
 
                     newTask = {
@@ -1408,7 +1408,7 @@
                         pid: p.id, targetAmount: amount, subItems: new Array(amount).fill(false), completed: false,
                         duration: String(calculatedDuration), startTime: form.startTime || '', createdAt: Date.now()
                     };
-                    
+
                     if (selectedTopic) {
                         newTask.topic = selectedTopic.topic || null;
                         newTask.source = selectedTopic.source || null;
@@ -1425,17 +1425,17 @@
             const toggleTask = (taskId) => {
                 try {
                     // KORUMA 1: Null ve Undefined elemanları anında filtrele
-                    const rawTasks = Array.isArray(currentDayData.tasks) 
-                        ? currentDayData.tasks 
+                    const rawTasks = Array.isArray(currentDayData.tasks)
+                        ? currentDayData.tasks
                         : Object.values(currentDayData.tasks || {});
                     const tasksArr = rawTasks.filter(t => t !== null && t !== undefined);
-                        
+
                     const task = tasksArr.find(t => String(t.id) === String(taskId));
                     if (!task) return;
-                    
+
                     const newStatus = !task.completed;
                     if (typeof updateGold === 'function') updateGold(newStatus ? 10 : -10);
-                    
+
                     const updatedTasks = tasksArr.map(t => String(t.id) === String(taskId) ? { ...t, completed: newStatus, lastActivityAt: Date.now() } : t);
                     if (typeof updateCloud === 'function') updateCloud(`history/${dateKey}/tasks`, updatedTasks);
 
@@ -1443,23 +1443,23 @@
                         // KORUMA 2: Projects dizisindeki olası Null'ları filtrele
                         const safeProjects = (projects || []).filter(p => p !== null && p !== undefined);
                         const targetProject = safeProjects.find(p => String(p.id) === String(task.pid));
-                        
+
                         if (targetProject && targetProject.projectItems) {
                             const items = Array.isArray(targetProject.projectItems) ? [...targetProject.projectItems] : { ...targetProject.projectItems };
                             // KORUMA 3: itemKey ararken i && ve items[k] && kontrolü
-                            const itemKey = Array.isArray(items) 
-                                ? items.findIndex(i => i && String(i.id) === String(task.projectItemId)) 
+                            const itemKey = Array.isArray(items)
+                                ? items.findIndex(i => i && String(i.id) === String(task.projectItemId))
                                 : Object.keys(items).find(k => items[k] && String(items[k].id) === String(task.projectItemId));
-                            
+
                             if (itemKey !== -1 && itemKey !== undefined) {
                                 const currentCompleted = Number(items[itemKey].completedAmount) || 0;
                                 const defaultAmt = Number(task.targetAmount || task.amount || 1);
                                 const amountModifier = newStatus ? defaultAmt : -defaultAmt;
-                                
+
                                 const newAmount = Math.max(0, currentCompleted + amountModifier);
-                                
+
                                 items[itemKey] = { ...items[itemKey], completedAmount: newAmount };
-                                
+
                                 const updatedProjects = safeProjects.map(p => String(p.id) === String(task.pid) ? { ...p, projectItems: items } : p);
                                 if (typeof updateCloud === 'function') updateCloud('projects', updatedProjects);
                             }
@@ -1472,14 +1472,14 @@
 
             const toggleSubItem = (taskId, index) => {
                 try {
-                    const rawTasks = Array.isArray(currentDayData.tasks) 
-                        ? currentDayData.tasks 
+                    const rawTasks = Array.isArray(currentDayData.tasks)
+                        ? currentDayData.tasks
                         : Object.values(currentDayData.tasks || {});
                     const tasksArr = rawTasks.filter(t => t !== null && t !== undefined);
-                        
+
                     const task = tasksArr.find(t => String(t.id) === String(taskId));
                     if (!task) return;
-                    
+
                     const newSubItems = [...(task.subItems || [])];
                     const wasDone = newSubItems[index];
                     newSubItems[index] = !wasDone;
@@ -1494,16 +1494,16 @@
                     if (task.type === 'project_slice') {
                         const safeProjects = (projects || []).filter(p => p !== null && p !== undefined);
                         const targetProject = safeProjects.find(p => String(p.id) === String(task.pid));
-                        
+
                         if (targetProject) {
                             const newCurrent = Math.max(0, (targetProject.currentUnit || 0) + (wasDone ? -1 : 1));
                             let items = targetProject.projectItems;
                             if (task.projectItemId && targetProject.projectItems) {
                                 items = Array.isArray(targetProject.projectItems) ? [...targetProject.projectItems] : { ...targetProject.projectItems };
-                                const itemKey = Array.isArray(items) 
-                                    ? items.findIndex(i => i && String(i.id) === String(task.projectItemId)) 
+                                const itemKey = Array.isArray(items)
+                                    ? items.findIndex(i => i && String(i.id) === String(task.projectItemId))
                                     : Object.keys(items).find(k => items[k] && String(items[k].id) === String(task.projectItemId));
-                                
+
                                 if (itemKey !== -1 && itemKey !== undefined) {
                                     const currentCompleted = Number(items[itemKey].completedAmount) || 0;
                                     const amountModifier = wasDone ? -1 : 1;
@@ -1544,17 +1544,17 @@
                 const newTopics = new Set();
                 const newSources = new Set();
                 const newTypes = new Set();
-                
+
                 (items || []).forEach(item => {
                     const topic = item.topic?.trim();
                     const source = item.source?.trim();
                     const type = item.type?.trim();
-                    
+
                     if (topic && !globalTags.topics.includes(topic)) newTopics.add(topic);
                     if (source && !globalTags.sources.includes(source)) newSources.add(source);
                     if (type && !globalTags.types.includes(type)) newTypes.add(type);
                 });
-                
+
                 if (newTopics.size > 0 || newSources.size > 0 || newTypes.size > 0) {
                     const updates = {};
                     if (newTopics.size > 0) updates.topics = [...globalTags.topics, ...newTopics];
@@ -1634,16 +1634,16 @@
                 }
                 setModal({ open: false, type: null, data: null });
             };
-            const openModal = (type, data = null) => { 
-                setModal({ open: true, type, data }); 
+            const openModal = (type, data = null) => {
+                setModal({ open: true, type, data });
                 let newForm = {};
-                if (type === 'journal') { 
-                    newForm = { mood: currentDayData.journal?.mood || '😐', note: currentDayData.journal?.note || '' }; 
+                if (type === 'journal') {
+                    newForm = { mood: currentDayData.journal?.mood || '😐', note: currentDayData.journal?.note || '' };
                 } else if (type === 'project') {
                     let pItems = data?.projectItems ? (Array.isArray(data.projectItems) ? [...data.projectItems] : Object.values(data.projectItems)) : [];
                     newForm = { ...data, projectItems: pItems };
                 }
-                setForm(newForm); 
+                setForm(newForm);
             };
 
             // Auto-open journal modal ONCE per session+day
