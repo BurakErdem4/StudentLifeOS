@@ -1360,7 +1360,17 @@
                 return () => clearInterval(interval);
             }, [focusMode]);
 
-            const updateCloud = (path, value) => { if (!user) return; db.ref(`users/${user.uid}/${path}`).set(value); };
+            const updateCloud = (path, value) => { 
+                if (!user) return; 
+                try {
+                    // KESİN ÇÖZÜM: Firebase "undefined" değerleri kabul etmez ve anında kodu çökertir (Silent Crash).
+                    // Objelerin içindeki olası 'undefined' değerleri güvenle temizlemek için deep-copy yapıyoruz.
+                    const cleanValue = JSON.parse(JSON.stringify(value));
+                    db.ref(`users/${user.uid}/${path}`).set(cleanValue); 
+                } catch (e) {
+                    console.error("Firebase Sync Error:", e);
+                }
+            };
             const updateGold = (amount) => {
                 const newGold = Math.max(0, gold + amount);
                 updateCloud('gold', newGold);
@@ -1406,40 +1416,108 @@
                         newTask.projectItemId = selectedTopic.id || null;
                     }
                 }
-                const newTasks = [...(currentDayData.tasks || []), newTask];
+                const tasksArr = Array.isArray(currentDayData.tasks) ? currentDayData.tasks : Object.values(currentDayData.tasks || {});
+                const newTasks = [...tasksArr, newTask];
                 updateCloud(`history/${dateKey}/tasks`, newTasks);
                 closeModal();
             };
 
             const toggleTask = (taskId) => {
-                const task = currentDayData.tasks.find(t => t.id === taskId);
-                const newStatus = !task.completed;
-                updateGold(newStatus ? 10 : -10);
-                const updatedTasks = currentDayData.tasks.map(t => t.id === taskId ? { ...t, completed: newStatus, lastActivityAt: Date.now() } : t);
-                updateCloud(`history/${dateKey}/tasks`, updatedTasks);
+                try {
+                    // KORUMA 1: Null ve Undefined elemanları anında filtrele
+                    const rawTasks = Array.isArray(currentDayData.tasks) 
+                        ? currentDayData.tasks 
+                        : Object.values(currentDayData.tasks || {});
+                    const tasksArr = rawTasks.filter(t => t !== null && t !== undefined);
+                        
+                    const task = tasksArr.find(t => String(t.id) === String(taskId));
+                    if (!task) return;
+                    
+                    const newStatus = !task.completed;
+                    if (typeof updateGold === 'function') updateGold(newStatus ? 10 : -10);
+                    
+                    const updatedTasks = tasksArr.map(t => String(t.id) === String(taskId) ? { ...t, completed: newStatus, lastActivityAt: Date.now() } : t);
+                    if (typeof updateCloud === 'function') updateCloud(`history/${dateKey}/tasks`, updatedTasks);
+
+                    if (task.pid && task.projectItemId) {
+                        // KORUMA 2: Projects dizisindeki olası Null'ları filtrele
+                        const safeProjects = (projects || []).filter(p => p !== null && p !== undefined);
+                        const targetProject = safeProjects.find(p => String(p.id) === String(task.pid));
+                        
+                        if (targetProject && targetProject.projectItems) {
+                            const items = Array.isArray(targetProject.projectItems) ? [...targetProject.projectItems] : { ...targetProject.projectItems };
+                            // KORUMA 3: itemKey ararken i && ve items[k] && kontrolü
+                            const itemKey = Array.isArray(items) 
+                                ? items.findIndex(i => i && String(i.id) === String(task.projectItemId)) 
+                                : Object.keys(items).find(k => items[k] && String(items[k].id) === String(task.projectItemId));
+                            
+                            if (itemKey !== -1 && itemKey !== undefined) {
+                                const currentCompleted = Number(items[itemKey].completedAmount) || 0;
+                                const defaultAmt = Number(task.targetAmount || task.amount || 1);
+                                const amountModifier = newStatus ? defaultAmt : -defaultAmt;
+                                
+                                const newAmount = Math.max(0, currentCompleted + amountModifier);
+                                
+                                items[itemKey] = { ...items[itemKey], completedAmount: newAmount };
+                                
+                                const updatedProjects = safeProjects.map(p => String(p.id) === String(task.pid) ? { ...p, projectItems: items } : p);
+                                if (typeof updateCloud === 'function') updateCloud('projects', updatedProjects);
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error("ToggleTask Error:", err);
+                }
             };
 
             const toggleSubItem = (taskId, index) => {
-                const task = currentDayData.tasks.find(t => t.id === taskId);
-                const newSubItems = [...task.subItems];
-                const wasDone = newSubItems[index];
-                newSubItems[index] = !wasDone;
+                try {
+                    const rawTasks = Array.isArray(currentDayData.tasks) 
+                        ? currentDayData.tasks 
+                        : Object.values(currentDayData.tasks || {});
+                    const tasksArr = rawTasks.filter(t => t !== null && t !== undefined);
+                        
+                    const task = tasksArr.find(t => String(t.id) === String(taskId));
+                    if (!task) return;
+                    
+                    const newSubItems = [...(task.subItems || [])];
+                    const wasDone = newSubItems[index];
+                    newSubItems[index] = !wasDone;
 
-                if (task.type === 'project_slice') {
-                    const targetProject = projects.find(p => String(p.id) === String(task.pid));
-                    if (targetProject) {
-                        const newCurrent = Math.max(0, targetProject.currentUnit + (wasDone ? -1 : 1));
-                        const updatedProjects = projects.map(p => String(p.id) === String(task.pid) ? { ...p, currentUnit: newCurrent } : p);
-                        updateCloud('projects', updatedProjects);
+                    // ÖNCELİK 1: Hızlı UI Tepkisi İçin Önce Task'ı Güncelle (Crash olsa bile tik kalır)
+                    const allDone = newSubItems.every(i => i === true);
+                    if (typeof updateGold === 'function') updateGold(wasDone ? -5 : 5);
+                    const updatedTasks = tasksArr.map(t => String(t.id) === String(taskId) ? { ...t, subItems: newSubItems, completed: allDone, lastActivityAt: Date.now() } : t);
+                    if (typeof updateCloud === 'function') updateCloud(`history/${dateKey}/tasks`, updatedTasks);
+
+                    // ÖNCELİK 2: Alt Puan/Proje İlerlemelerini Güncelle
+                    if (task.type === 'project_slice') {
+                        const safeProjects = (projects || []).filter(p => p !== null && p !== undefined);
+                        const targetProject = safeProjects.find(p => String(p.id) === String(task.pid));
+                        
+                        if (targetProject) {
+                            const newCurrent = Math.max(0, (targetProject.currentUnit || 0) + (wasDone ? -1 : 1));
+                            let items = targetProject.projectItems;
+                            if (task.projectItemId && targetProject.projectItems) {
+                                items = Array.isArray(targetProject.projectItems) ? [...targetProject.projectItems] : { ...targetProject.projectItems };
+                                const itemKey = Array.isArray(items) 
+                                    ? items.findIndex(i => i && String(i.id) === String(task.projectItemId)) 
+                                    : Object.keys(items).find(k => items[k] && String(items[k].id) === String(task.projectItemId));
+                                
+                                if (itemKey !== -1 && itemKey !== undefined) {
+                                    const currentCompleted = Number(items[itemKey].completedAmount) || 0;
+                                    const amountModifier = wasDone ? -1 : 1;
+                                    const newAmount = Math.max(0, currentCompleted + amountModifier);
+                                    items[itemKey] = { ...items[itemKey], completedAmount: newAmount };
+                                }
+                            }
+                            const updatedProjects = safeProjects.map(p => String(p.id) === String(task.pid) ? { ...p, currentUnit: newCurrent, projectItems: items } : p);
+                            if (typeof updateCloud === 'function') updateCloud('projects', updatedProjects);
+                        }
                     }
+                } catch (err) {
+                    console.error("ToggleSubItem Error:", err);
                 }
-                const allDone = newSubItems.every(i => i === true);
-                updateGold(wasDone ? -5 : 5);
-                const updatedTasks = currentDayData.tasks.map(t => {
-                    if (t.id === taskId) return { ...t, subItems: newSubItems, completed: allDone, lastActivityAt: Date.now() };
-                    return t;
-                });
-                updateCloud(`history/${dateKey}/tasks`, updatedTasks);
             };
 
             const toggleHabit = (habitId) => {
@@ -1451,12 +1529,13 @@
             };
 
             const deleteTask = (id) => {
-                const task = currentDayData.tasks.find(t => t.id === id);
+                const tasksArr = Array.isArray(currentDayData.tasks) ? currentDayData.tasks : Object.values(currentDayData.tasks || {});
+                const task = tasksArr.find(t => t.id === id);
                 if (task?.isMentorTask && task?.allowDelete === false) {
                     alert("Bu görev kilitli! Mentor onayı olmadan silemezsin.");
                     return;
                 }
-                updateCloud(`history/${dateKey}/tasks`, currentDayData.tasks.filter(t => t.id !== id));
+                updateCloud(`history/${dateKey}/tasks`, tasksArr.filter(t => t.id !== id));
             };
             const deleteHabit = (id) => updateCloud('habits', habits.filter(h => h.id !== id));
             const addHabit = () => { if (form.title) { updateCloud('habits', [...habits, { id: Date.now(), title: form.title, icon: form.icon || '✨' }]); setForm({ title: '', icon: '' }); } };

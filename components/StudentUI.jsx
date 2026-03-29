@@ -882,6 +882,39 @@ const STUDY_TEMPLATES = [
                 notes: `TEKRAR TAKİBİ:\n- [ ] Tüm konuları tekrarla\n- [ ] Yanlış defterini gözden geçir\n- [ ] Deneme sınavı çöz\n- [ ] Zayıf noktaları tespit et ve tekrar çalış`
             }
         ]
+    },
+    {
+        id: 'acil_matematik_tyt',
+        title: "Acil Matematik TYT Soru Bankası",
+        category: "Matematik",
+        desc: "Bölümlere ayrılmış, Türkiye geneli popüler Acil Matematik TYT Soru Bankası müfredatı.",
+        icon: "📐",
+        color: "from-orange-500 to-red-600",
+        totalUnit: 410,
+        unit: "Sayfa",
+        totalEstTime: 40,
+        projectItems: [
+            { id: "am1", topic: "Sayı Kümeleri", source: "Acil Matematik", type: "Soru Bankası", amount: 4 },
+            { id: "am2", topic: "Pozitif ve Negatif Tam Sayılar", source: "Acil Matematik", type: "Soru Bankası", amount: 6 },
+            { id: "am3", topic: "Tek ve Çift Sayılar", source: "Acil Matematik", type: "Soru Bankası", amount: 8 },
+            { id: "am4", topic: "Ardışık Sayılar ve Örüntü", source: "Acil Matematik", type: "Soru Bankası", amount: 6 },
+            { id: "am5", topic: "Basamak Kavramı", source: "Acil Matematik", type: "Soru Bankası", amount: 12 },
+            { id: "am6", topic: "En Küçük ve En Büyük Değer Bulma", source: "Acil Matematik", type: "Soru Bankası", amount: 6 },
+            { id: "am7", topic: "Bölme İşlemi", source: "Acil Matematik", type: "Soru Bankası", amount: 6 },
+            { id: "am8", topic: "Bölünebilme Kuralları", source: "Acil Matematik", type: "Soru Bankası", amount: 10 },
+            { id: "am9", topic: "Faktöriyel", source: "Acil Matematik", type: "Soru Bankası", amount: 4 },
+            { id: "am10", topic: "Asal Sayılar ve Çarpanlara Ayırma", source: "Acil Matematik", type: "Soru Bankası", amount: 8 },
+            { id: "am11", topic: "EBOB ve EKOK", source: "Acil Matematik", type: "Soru Bankası", amount: 12 },
+            { id: "am12", topic: "Sihirli Sayılar", source: "Acil Matematik", type: "Soru Bankası", amount: 2 },
+            { id: "am13", topic: "Rasyonel ve Ondalık Sayılar", source: "Acil Matematik", type: "Soru Bankası", amount: 16 },
+            { id: "am14", topic: "Mutlak Değer", source: "Acil Matematik", type: "Soru Bankası", amount: 16 },
+            { id: "am15", topic: "Üslü Sayılar", source: "Acil Matematik", type: "Soru Bankası", amount: 16 },
+            { id: "am16", topic: "Köklü Sayılar", source: "Acil Matematik", type: "Soru Bankası", amount: 14 },
+            { id: "am17", topic: "İşlem Yeteneği", source: "Acil Matematik", type: "Soru Bankası", amount: 14 },
+            { id: "am18", topic: "Çarpanlara Ayırma", source: "Acil Matematik", type: "Soru Bankası", amount: 6 },
+            { id: "am19", topic: "Oran ve Orantı", source: "Acil Matematik", type: "Soru Bankası", amount: 16 },
+            { id: "am20", topic: "Birinci Dereceden Denklemler", source: "Acil Matematik", type: "Soru Bankası", amount: 8 }
+        ]
     }
 ];
 
@@ -920,6 +953,12 @@ const PRESET_CATEGORIES = [
                     getTemplate('bundle_ayt_sozel'),
                     getTemplate('bundle_ayt_sozel_konu'),
                     getTemplate('t_paragraf_rutin')
+                ].filter(Boolean)
+            },
+            {
+                title: 'Özel Kaynaklar / Soru Bankaları',
+                items: [
+                    getTemplate('acil_matematik_tyt')
                 ].filter(Boolean)
             }
         ]
@@ -981,6 +1020,32 @@ const StudentUI = ({
     const [profileView, setProfileView] = React.useState('analytics'); // 'analytics' | 'routines'
     const [dataAccordionOpen, setDataAccordionOpen] = React.useState(false);
     const [showTimeline, setShowTimeline] = React.useState(false);
+
+    const timelineRef = React.useRef(null);
+    const [currentTime, setCurrentTime] = React.useState({ h: 0, m: 0 });
+
+    React.useEffect(() => {
+        if (showTimeline && todayKey === dateKey) {
+            const updateTime = () => {
+                const now = new Date();
+                setCurrentTime({ h: now.getHours(), m: now.getMinutes() });
+            };
+            updateTime();
+            const interval = setInterval(updateTime, 60000);
+            return () => clearInterval(interval);
+        }
+    }, [showTimeline, todayKey, dateKey]);
+
+    React.useEffect(() => {
+        if (showTimeline && timelineRef.current) {
+            const targetY = 7 * 44; 
+            setTimeout(() => {
+                if (timelineRef.current) {
+                    timelineRef.current.scrollTo({ top: targetY, behavior: 'smooth' });
+                }
+            }, 50);
+        }
+    }, [showTimeline]);
 
     const [isDarkMode, setIsDarkMode] = React.useState(false);
 
@@ -1044,7 +1109,8 @@ const StudentUI = ({
                 totalEstTime: template.totalEstTime,
                 notes: template.defaultNotes || template.desc,
                 icon: template.icon,
-                color: template.color
+                color: template.color,
+                projectItems: template.projectItems || {}
             }];
         }
 
@@ -1334,6 +1400,10 @@ const StudentUI = ({
                                 <div className="flex flex-col gap-2 w-full">
                                     <div className="flex justify-between items-start">
                                         <div>
+                                            {(() => {
+                                                const pMatch = (t.pid || t.projectId) ? projects.find(p => String(p.id) === String(t.pid || t.projectId)) : null;
+                                                return pMatch ? <div className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-0.5">{pMatch.title}</div> : null;
+                                            })()}
                                             <div className={`font-bold text-sm text-gray-800 dark:text-slate-100 ${t.completed ? 'line-through' : ''}`}>
                                                 {t.title}
                                                 {t.isMentorTask && <span className="ml-2 text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 px-1.5 py-0.5 rounded">👨‍🏫 MENTOR</span>}
@@ -1366,6 +1436,10 @@ const StudentUI = ({
                                         {t.completed && <Icons.Check stroke="white" />}
                                     </button>
                                     <div className="flex-1">
+                                        {(() => {
+                                            const pMatch = (t.pid || t.projectId) ? projects.find(p => String(p.id) === String(t.pid || t.projectId)) : null;
+                                            return pMatch ? <div className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-0.5">{pMatch.title}</div> : null;
+                                        })()}
                                         <div className={`font-bold text-sm text-gray-800 dark:text-slate-100 ${t.completed ? 'line-through' : ''}`}>
                                             {t.title}
                                             {t.isMentorTask && <span className="ml-2 text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 px-1.5 py-0.5 rounded">👨‍🏫 MENTOR</span>}
@@ -1514,6 +1588,17 @@ const StudentUI = ({
     return (
         <div className="flex flex-col h-full w-full max-w-md mx-auto bg-white dark:bg-slate-800 dark:bg-slate-900 shadow-2xl relative overflow-hidden dark:text-gray-100 transition-colors duration-300">
             {renderHeader()}
+
+            {profile?.settings?.showTimelineShortcut && activeTab === 'calendar' && calendarMode === 'day' && (
+                <button
+                    onClick={() => setShowTimeline(true)}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-500/80 backdrop-blur-sm text-white py-4 px-1.5 rounded-l-xl shadow-[0_0_15px_rgba(0,0,0,0.2)] z-40 transition-transform flex flex-col items-center justify-center border-y border-l border-indigo-400/50 group w-8 hover:bg-indigo-600"
+                    title="Günün Akışını Gör"
+                >
+                    <span className="text-lg font-black leading-none group-hover:-translate-x-1 transition-transform opacity-70 mb-1">‹</span>
+                    <span className="text-xs">🗓️</span>
+                </button>
+            )}
 
             <div className="flex-1 overflow-y-auto no-scrollbar bg-white dark:bg-slate-800 dark:bg-slate-900 transition-colors duration-300">
                 {activeTab === 'calendar' && (
@@ -2069,14 +2154,29 @@ const StudentUI = ({
                                                             <select
                                                                 className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-200 outline-none border border-gray-100 dark:border-slate-600 focus:border-indigo-300 focus:bg-white transition appearance-none cursor-pointer pr-10"
                                                                 value={form.selectedProjectItemId || ''}
-                                                                onChange={(e) => setForm({ ...form, selectedProjectItemId: e.target.value })}
+                                                                onChange={(e) => {
+                                                                    const idVal = e.target.value;
+                                                                    let autoTime = form.time;
+                                                                    const item = items.find(i => String(i.id) === idVal);
+                                                                    if (item && p.totalEstTime && p.totalUnit && item.amount) {
+                                                                        const totalMinutes = Number(p.totalEstTime) * 60;
+                                                                        const timePerUnit = totalMinutes / Number(p.totalUnit);
+                                                                        if (!isNaN(timePerUnit) && isFinite(timePerUnit)) {
+                                                                            autoTime = String(Math.round(timePerUnit * Number(item.amount)));
+                                                                        }
+                                                                    }
+                                                                    setForm({ ...form, selectedProjectItemId: idVal, time: autoTime });
+                                                                }}
                                                             >
                                                                 <option value="">Ağaç Geneli (Serbest Miktar)</option>
-                                                                {items.map(item => (
-                                                                    <option key={item.id} value={item.id}>
-                                                                        {[item.topic, item.source].filter(Boolean).join(' - ') || 'Konu/Kaynak'} (Kalan: {item.amount || 0} {item.unit || p.unit})
-                                                                    </option>
-                                                                ))}
+                                                                {items.map(item => {
+                                                                    const rem = Number(item.amount) - (Number(item.completedAmount) || 0);
+                                                                    return (
+                                                                        <option key={item.id} value={item.id}>
+                                                                            {[item.topic, item.source].filter(Boolean).join(' - ') || 'Konu/Kaynak'} (Kalan: {rem} {item.unit || p.unit})
+                                                                        </option>
+                                                                    );
+                                                                })}
                                                             </select>
                                                             <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 dark:text-slate-400 text-xs">
                                                                 ▼
@@ -2095,8 +2195,10 @@ const StudentUI = ({
                                                     const p = projects.find(pr => String(pr.id) === String(form.projectId));
                                                     let time = '';
                                                     if (val && p && p.totalEstTime && p.totalUnit) {
-                                                        const timePerUnit = (p.totalEstTime * 60) / p.totalUnit;
-                                                        time = Math.round(timePerUnit * Number(val));
+                                                        const timePerUnit = (Number(p.totalEstTime) * 60) / Number(p.totalUnit);
+                                                        if (!isNaN(timePerUnit) && isFinite(timePerUnit)) {
+                                                            time = String(Math.round(timePerUnit * Number(val)));
+                                                        }
                                                     }
                                                     setForm({ ...form, amount: val, time: time });
                                                 }} placeholder="0" />
@@ -2313,6 +2415,31 @@ const StudentUI = ({
                                         </div>
                                         <button onClick={toggleDarkMode} className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none ${isDarkMode ? 'bg-indigo-500' : 'bg-gray-200'}`}>
                                             <span className={`${isDarkMode ? 'translate-x-6' : 'translate-x-1'} inline-block w-4 h-4 transform bg-white dark:bg-slate-800 rounded-full transition-transform shadow-sm`} />
+                                        </button>
+                                    </div>
+
+                                    {/* Günün Akışı Kısayolu Ayarı */}
+                                    <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 p-4 rounded-2xl flex items-center justify-between shadow-sm transition-all hover:border-gray-200 mt-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shadow-sm bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 transition-colors">
+                                                🗓️
+                                            </div>
+                                            <div className="flex flex-col pr-4">
+                                                <span className="font-bold text-sm text-gray-800 dark:text-slate-100">Günün Akışı Kısayolu</span>
+                                                <span className="text-[10px] text-gray-400 dark:text-slate-400 font-medium">Ana ekranda sağ kenara hızlı erişim butonu ekler</span>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={() => {
+                                                const currentSettings = profile?.settings || {};
+                                                const newVal = !(currentSettings.showTimelineShortcut === true); // default false
+                                                if (typeof updateCloud === 'function') {
+                                                    updateCloud('profile/settings', { ...currentSettings, showTimelineShortcut: newVal });
+                                                }
+                                            }}
+                                            className={`relative inline-flex items-center h-6 rounded-full w-11 shrink-0 transition-colors focus:outline-none ${profile?.settings?.showTimelineShortcut ? 'bg-indigo-500' : 'bg-gray-200'}`}
+                                        >
+                                            <span className={`${profile?.settings?.showTimelineShortcut ? 'translate-x-6' : 'translate-x-1'} inline-block w-4 h-4 transform bg-white dark:bg-slate-800 rounded-full transition-transform shadow-sm`} />
                                         </button>
                                     </div>
                                 </div>
@@ -2730,31 +2857,44 @@ const StudentUI = ({
                         </div>
 
                         {/* HOUR GRID */}
-                        <div className="flex-1 overflow-y-auto relative" style={{ scrollbarWidth: 'none' }}>
-                            <div className="relative" style={{ height: `${24 * 60}px` }}>
+                        <div ref={timelineRef} className="flex-1 overflow-y-auto relative scroll-smooth" style={{ scrollbarWidth: 'none' }}>
+                            <div className="relative" style={{ height: `${24 * 44}px` }}>
                                 {/* Hour lines */}
                                 {Array.from({ length: 24 }, (_, h) => (
-                                    <div key={h} className="absolute left-0 right-0 flex items-start" style={{ top: `${h * 60}px`, height: '60px' }}>
-                                        <span className="text-[10px] font-bold text-gray-300 dark:text-slate-600 w-12 text-right pr-2 pt-0.5 select-none flex-shrink-0">
+                                    <div key={h} className="absolute left-0 right-0 flex items-start" style={{ top: `${h * 44}px`, height: '44px' }}>
+                                        <span className="text-[10px] font-bold text-gray-400 dark:text-slate-500 w-12 text-right pr-2 select-none flex-shrink-0 opacity-80" style={{ transform: 'translateY(-50%)' }}>
                                             {String(h).padStart(2, '0')}:00
                                         </span>
-                                        <div className="flex-1 border-t border-gray-100 dark:border-slate-700/60 mt-2" />
+                                        <div className="flex-1 border-t border-gray-100 dark:border-slate-800/80" style={{ transform: 'translateY(-1px)' }} />
                                     </div>
                                 ))}
+
+                                {/* Red Current Time Indicator */}
+                                {todayKey === dateKey && (
+                                    <div 
+                                        className="absolute left-10 right-0 h-[2px] bg-red-500 z-30 pointer-events-none transition-all duration-1000"
+                                        style={{ top: `${(currentTime.h * 44) + ((currentTime.m / 60) * 44)}px` }}
+                                    >
+                                        <div className="absolute -left-1.5 -top-[5px] w-3 h-3 bg-red-500 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.8)]"></div>
+                                    </div>
+                                )}
 
                                 {/* Task blocks */}
                                 {timelineTasks.map((t, idx) => {
                                     const [hStr, mStr] = t.startTime.split(':');
                                     const h = parseInt(hStr, 10) || 0;
                                     const m = parseInt(mStr, 10) || 0;
-                                    const topPx = h * 60 + m;
-                                    const heightPx = Math.max(30, Number(t.duration) || 30);
+                                    const topPx = (h * 44) + ((m / 60) * 44);
+                                    
+                                    const rawDur = Number(t.duration) || 30;
+                                    const heightPx = Math.max(26, (rawDur / 60) * 44);
+                                    
                                     const colLight = colors[idx % colors.length];
                                     const colDark = darkColors[idx % darkColors.length];
                                     return (
                                         <div
                                             key={t.id}
-                                            className="absolute overflow-hidden rounded-r-lg"
+                                            className="absolute overflow-hidden rounded-xl shadow-sm transition-all hover:scale-[1.02] hover:z-20 cursor-pointer"
                                             style={{
                                                 top: `${topPx}px`,
                                                 left: '52px',
@@ -2764,13 +2904,13 @@ const StudentUI = ({
                                                 borderLeft: `3px solid ${isDarkMode ? colDark.border : colLight.border}`,
                                             }}
                                         >
-                                            <div className="px-2 pt-1 overflow-hidden h-full">
+                                            <div className="px-2 py-0.5 overflow-hidden h-full flex flex-col justify-center">
                                                 <div className="font-bold text-[11px] leading-tight truncate" style={{ color: isDarkMode ? colDark.text : colLight.text }}>
                                                     {t.title}
                                                 </div>
-                                                {heightPx >= 40 && (
-                                                    <div className="text-[10px] opacity-70 font-medium" style={{ color: isDarkMode ? colDark.text : colLight.text }}>
-                                                        {t.startTime} · {t.duration} dk
+                                                {heightPx >= 34 && (
+                                                    <div className="text-[10px] opacity-80 font-medium truncate mt-0.5" style={{ color: isDarkMode ? colDark.text : colLight.text }}>
+                                                        {t.startTime} <span className="opacity-50">•</span> {t.duration} dk
                                                     </div>
                                                 )}
                                             </div>

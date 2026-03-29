@@ -1652,6 +1652,7 @@ const StudentDetailModal = ({ student, classes, onClose }) => {
     const [editingNoteId, setEditingNoteId] = useState(null);
     const [editingNoteText, setEditingNoteText] = useState('');
     const [globalTags, setGlobalTags] = useState({ topics: [], sources: [], types: [] });
+    const [visibleTaskCount, setVisibleTaskCount] = useState(5);
 
     useEffect(() => {
         const tagsRef = db.ref('globalTags');
@@ -1768,7 +1769,8 @@ const StudentDetailModal = ({ student, classes, onClose }) => {
             addedBy: 'mentor',
             topic: form.topic || null,
             source: form.source || null,
-            typeStr: form.taskType || null
+            typeStr: form.taskType || null,
+            projectItemId: form.selectedProjectItemId || null
         };
         
         if (form.projectId) {
@@ -1784,6 +1786,13 @@ const StudentDetailModal = ({ student, classes, onClose }) => {
 
         setForm({ ...form, title: '', topic: '', source: '', taskType: '', duration: '', amount: '', unit: '', projectId: '' });
         alert(`${targetK} tarihine görev atandı!`);
+    };
+
+    const handleDeleteAssignedTask = (task) => {
+        if (!confirm('Bu görevi iptal etmek istediğinize emin misiniz?')) return;
+        const currentTasks = (student.history && student.history[task.assignedDateKey] && student.history[task.assignedDateKey].tasks) || [];
+        const updatedTasks = currentTasks.filter(t => t.id !== task.id);
+        db.ref(`users/${student.uid}/history/${task.assignedDateKey}/tasks`).set(updatedTasks);
     };
 
     const toggleStoreLock = () => {
@@ -1905,27 +1914,67 @@ const StudentDetailModal = ({ student, classes, onClose }) => {
                                         
                                         if (selectedP && pItems.length > 0) {
                                             return (
-                                                <div className="relative">
-                                                    <select 
-                                                        className="w-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 p-3 rounded-xl text-sm font-bold outline-none border border-indigo-100 dark:border-indigo-500/30 appearance-none"
-                                                        value={form.topic || ''}
-                                                        onChange={e => {
-                                                            const item = pItems.find(i => String(i.id) === e.target.value);
-                                                            if (item) {
-                                                                setForm({ ...form, topic: item.topic || '', source: item.source || '', taskType: item.type || '', amount: item.amount || '', unit: item.unit || selectedP.unit || '' });
-                                                            } else {
-                                                                setForm({ ...form, topic: '', source: '', taskType: '' });
-                                                            }
-                                                        }}
-                                                    >
-                                                        <option value="">Ağaçtan Konu / Kaynak Seçin</option>
-                                                        {pItems.map(item => (
-                                                            <option key={item.id} value={item.id}>
-                                                                {[item.topic, item.source].filter(Boolean).join(' - ')} ({item.amount} {item.unit || selectedP.unit})
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-indigo-400 text-xs">▼</div>
+                                                <div className="space-y-3">
+                                                    <div className="relative">
+                                                        <select 
+                                                            className="w-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 p-3 rounded-xl text-sm font-bold outline-none border border-indigo-100 dark:border-indigo-500/30 appearance-none"
+                                                            value={form.selectedProjectItemId || ''}
+                                                            onChange={e => {
+                                                                const idVal = e.target.value;
+                                                                const item = pItems.find(i => String(i.id) === idVal);
+                                                                if (item) {
+                                                                    let autoTime = '';
+                                                                    const remainingAmount = Math.max(0, Number(item.amount) - (Number(item.completedAmount) || 0));
+                                                                    
+                                                                    if (selectedP.totalEstTime && selectedP.totalUnit && remainingAmount) {
+                                                                        const totalMinutes = Number(selectedP.totalEstTime) * 60;
+                                                                        const timePerUnit = totalMinutes / Number(selectedP.totalUnit);
+                                                                        if (!isNaN(timePerUnit) && isFinite(timePerUnit)) {
+                                                                            autoTime = String(Math.round(timePerUnit * Number(remainingAmount)));
+                                                                        }
+                                                                    }
+                                                                    setForm({ ...form, selectedProjectItemId: idVal, topic: item.topic || '', source: item.source || '', taskType: item.type || '', amount: remainingAmount > 0 ? String(remainingAmount) : '', unit: item.unit || selectedP.unit || '', duration: autoTime });
+                                                                } else {
+                                                                    setForm({ ...form, selectedProjectItemId: '', topic: '', source: '', taskType: '', duration: '', amount: '' });
+                                                                }
+                                                            }}
+                                                        >
+                                                            <option value="">Ağaçtan Konu / Kaynak Seçin</option>
+                                                            {pItems.map(item => {
+                                                                const rem = Math.max(0, Number(item.amount) - (Number(item.completedAmount) || 0));
+                                                                return (
+                                                                    <option key={item.id} value={item.id}>
+                                                                        {[item.topic, item.source].filter(Boolean).join(' - ')} (Kalan: {rem} {item.unit || selectedP.unit})
+                                                                    </option>
+                                                                );
+                                                            })}
+                                                        </select>
+                                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-indigo-400 text-xs">▼</div>
+                                                    </div>
+                                                    
+                                                    {form.selectedProjectItemId && (
+                                                        <div className="flex items-center gap-2 bg-gray-50 dark:bg-slate-700 p-3 rounded-xl border border-gray-100 dark:border-slate-600 focus-within:border-indigo-300 transition-colors">
+                                                            <input 
+                                                                type="number" 
+                                                                className="flex-1 bg-transparent text-sm font-semibold outline-none text-gray-700 dark:text-slate-100" 
+                                                                placeholder="Miktar (Sayfa/Soru)" 
+                                                                value={form.amount || ''} 
+                                                                onChange={e => {
+                                                                    const reqAmt = e.target.value;
+                                                                    let autoTime = form.duration;
+                                                                    if (reqAmt && selectedP && selectedP.totalEstTime && selectedP.totalUnit) {
+                                                                        const totalMins = Number(selectedP.totalEstTime) * 60;
+                                                                        const minPerUnit = totalMins / Number(selectedP.totalUnit);
+                                                                        if (!isNaN(minPerUnit) && isFinite(minPerUnit)) {
+                                                                            autoTime = String(Math.round(minPerUnit * Number(reqAmt)));
+                                                                        }
+                                                                    }
+                                                                    setForm({ ...form, amount: reqAmt, duration: autoTime });
+                                                                }} 
+                                                            />
+                                                            {form.unit && <span className="text-xs font-bold text-gray-400 dark:text-slate-400 pl-2 border-l border-gray-200 dark:border-slate-600">{form.unit}</span>}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         }
@@ -1939,7 +1988,18 @@ const StudentDetailModal = ({ student, classes, onClose }) => {
                                                     <input list="ms-types" className="flex-1 bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-sm font-semibold text-gray-700 dark:text-slate-100 outline-none border border-gray-100 dark:border-slate-600 focus:border-indigo-300" placeholder="Tip (Örn: Test)" value={form.taskType || ''} onChange={e => setForm({ ...form, taskType: e.target.value })} />
                                                 </div>
                                                 <div className="flex gap-2">
-                                                    <input type="number" className="flex-1 bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-sm font-semibold text-gray-700 dark:text-slate-100 outline-none border border-gray-100 dark:border-slate-600 focus:border-indigo-300" placeholder="Miktar" value={form.amount || ''} onChange={e => setForm({ ...form, amount: e.target.value })} />
+                                                    <input type="number" className="flex-1 bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-sm font-semibold text-gray-700 dark:text-slate-100 outline-none border border-gray-100 dark:border-slate-600 focus:border-indigo-300" placeholder="Miktar" value={form.amount || ''} onChange={e => {
+                                                        const reqAmt = e.target.value;
+                                                        let autoTime = form.duration;
+                                                        if (reqAmt && selectedP && selectedP.totalEstTime && selectedP.totalUnit) {
+                                                            const totalMins = Number(selectedP.totalEstTime) * 60;
+                                                            const minPerUnit = totalMins / Number(selectedP.totalUnit);
+                                                            if (!isNaN(minPerUnit) && isFinite(minPerUnit)) {
+                                                                autoTime = String(Math.round(minPerUnit * Number(reqAmt)));
+                                                            }
+                                                        }
+                                                        setForm({ ...form, amount: reqAmt, duration: autoTime });
+                                                    }} />
                                                     <input className="flex-1 bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-sm font-semibold text-gray-700 dark:text-slate-100 outline-none border border-gray-100 dark:border-slate-600 focus:border-indigo-300" placeholder="Birim" value={form.unit || ''} onChange={e => setForm({ ...form, unit: e.target.value })} />
                                                 </div>
                                                 <datalist id="ms-topics">{(globalTags?.topics || []).map(t => <option key={t} value={t} />)}</datalist>
@@ -1967,6 +2027,102 @@ const StudentDetailModal = ({ student, classes, onClose }) => {
                                 <button onClick={handleAssignTask} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">Görevi Kaydet</button>
                             </div>
                         </div>
+
+                        {/* Mentor Tasks View */}
+                        {(() => {
+                            const allMentorTasks = [];
+                            if (student.history) {
+                                Object.entries(student.history).forEach(([dateKey, dayData]) => {
+                                    if (dayData && dayData.tasks) {
+                                        const rawTasks = Array.isArray(dayData.tasks) ? dayData.tasks : Object.values(dayData.tasks || {});
+                                        const mTasks = rawTasks.filter(t => t && (t.addedBy === 'mentor' || t.isMentorTask));
+                                        mTasks.forEach(t => {
+                                            allMentorTasks.push({ ...t, assignedDateKey: dateKey });
+                                        });
+                                    }
+                                });
+                            }
+                            
+                            // Yeniden Eskiye sıralama (ID timestamp olduğu için doğrudan kullanılabilir)
+                            allMentorTasks.sort((a, b) => Number(b.id) - Number(a.id));
+                            
+                            const displayedTasks = allMentorTasks.slice(0, visibleTaskCount);
+
+                            return (
+                                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="font-bold text-gray-800 dark:text-slate-100 flex items-center gap-2">
+                                            <span>📌</span>
+                                            <span>Son Atadığım Görevler</span>
+                                        </h3>
+                                        <span className="text-[10px] bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 font-bold px-2 py-1 rounded-lg border border-indigo-100 dark:border-indigo-500/30 tracking-wider">
+                                            {allMentorTasks.length} Görev Toplam
+                                        </span>
+                                    </div>
+                                    
+                                    {allMentorTasks.length === 0 ? (
+                                        <div className="text-center py-8 text-xs text-gray-400 dark:text-slate-500 italic border-2 border-dashed border-gray-100 dark:border-slate-700 rounded-xl">
+                                            Henüz hiçbir görev atamadınız.
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {displayedTasks.map(t => (
+                                                <div key={`${t.assignedDateKey}-${t.id}`} className="relative bg-gray-50 dark:bg-slate-700 p-4 rounded-xl border border-gray-100 dark:border-slate-600 flex flex-col gap-2 group transition-all hover:border-gray-200 dark:hover:border-slate-500 shadow-sm pt-5">
+                                                    
+                                                    {/* Okunabilir Tarih Etiketi */}
+                                                    <div className="absolute top-0 right-0 bg-indigo-100/60 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold px-3 py-1 rounded-bl-xl rounded-tr-xl border-b border-l border-indigo-200 dark:border-indigo-500/30 tracking-wide shadow-sm">
+                                                        {new Date(t.assignedDateKey).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'short' })}
+                                                    </div>
+
+                                                    <div className="flex justify-between items-start pr-8 mt-1">
+                                                        <div className="flex-1">
+                                                            <div className="font-bold text-sm text-gray-800 dark:text-slate-100 leading-tight pr-4">
+                                                                {t.title}
+                                                            </div>
+                                                            <div className="text-xs text-gray-500 dark:text-slate-400 mt-1 flex items-center gap-2 font-medium">
+                                                                <span>⏱️ {t.duration} dk</span>
+                                                                {t.type === 'project_slice' && t.targetAmount && (
+                                                                    <span>• 🎯 {t.targetAmount} adet</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="shrink-0 pt-0.5">
+                                                            {t.completed ? (
+                                                                <span className="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 text-[10px] font-bold px-2 py-1 rounded-lg border border-green-200 dark:border-green-500/30 flex items-center gap-1">
+                                                                    ✅ Tamamlandı
+                                                                </span>
+                                                            ) : (
+                                                                <span className="bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400 text-[10px] font-bold px-2 py-1 rounded-lg border border-orange-200 dark:border-orange-500/30 flex items-center gap-1">
+                                                                    ⏳ Bekliyor
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <button 
+                                                        onClick={() => handleDeleteAssignedTask(t)}
+                                                        className="absolute top-1/2 -translate-y-1/2 right-3 p-2 text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
+                                                        title="Görevi İptal Et"
+                                                    >
+                                                        <Icons.Trash />
+                                                    </button>
+                                                </div>
+                                            ))}
+
+                                            {/* Daha Fazla Göster Butonu */}
+                                            {visibleTaskCount < allMentorTasks.length && (
+                                                <button 
+                                                    onClick={() => setVisibleTaskCount(prev => prev + 5)}
+                                                    className="w-full mt-2 py-3 border-2 border-dashed border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 font-bold text-xs rounded-xl hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex items-center justify-center gap-2"
+                                                >
+                                                    <span className="text-lg leading-none">↓</span> Daha Fazla Göster
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
 
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 flex items-center justify-between">
                             <div>
