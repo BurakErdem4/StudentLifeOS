@@ -1726,7 +1726,22 @@ const StudentUI = ({
 
                             return (
                                 <>
-                                    {categories.map(cat => (
+                                    {categories.map(cat => {
+                                        const categoryProjects = grouped[cat];
+                                        const totalCategoryTime = categoryProjects.reduce((acc, p) => acc + (Number(p.totalEstTime) || 0), 0);
+                                        const completedCategoryTime = categoryProjects.reduce((acc, p) => {
+                                            const tu = Number(p.totalUnit) || 0;
+                                            const cu = Number(p.currentUnit) || 0;
+                                            const et = Number(p.totalEstTime) || 0;
+                                            if (tu === 0) return acc;
+                                            return acc + (cu / tu) * et;
+                                        }, 0);
+                                        const categoryProgressPercent = totalCategoryTime > 0
+                                            ? Math.min(100, Math.round((completedCategoryTime / totalCategoryTime) * 100))
+                                            : 0;
+                                        const isComplete = categoryProgressPercent >= 100;
+
+                                        return (
                                         <details key={cat} className="group mb-6 bg-white dark:bg-slate-800 rounded-3xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden list-none">
                                             <summary className="flex items-center justify-between p-5 cursor-pointer hover:bg-gray-50 transition list-none [&::-webkit-details-marker]:hidden">
                                                 <div className="flex items-center gap-3">
@@ -1734,7 +1749,12 @@ const StudentUI = ({
                                                     <h3 className="text-lg font-bold text-gray-800 dark:text-slate-100">{cat}</h3>
                                                     <span className="bg-indigo-100 text-indigo-600 text-xs font-bold px-2 py-1 rounded-lg">{grouped[cat].length}</span>
                                                 </div>
-                                                <span className="text-gray-400 dark:text-slate-400 group-open:rotate-90 transition-transform"><Icons.ChevronRight /></span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-xs font-black px-2.5 py-1 rounded-lg transition-all ${isComplete ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-200' : 'bg-indigo-500/15 text-indigo-500 dark:text-indigo-300'}`}>
+                                                        %{categoryProgressPercent}
+                                                    </span>
+                                                    <span className="text-gray-400 dark:text-slate-400 group-open:rotate-90 transition-transform"><Icons.ChevronRight /></span>
+                                                </div>
                                             </summary>
                                             <div className="p-5 pt-0 border-t border-gray-100 dark:border-slate-700 mt-2">
                                                 <div className="pt-4">
@@ -1742,7 +1762,8 @@ const StudentUI = ({
                                                 </div>
                                             </div>
                                         </details>
-                                    ))}
+                                        );
+                                    })}
 
                                     {uncategorized.length > 0 && (
                                         <div className="mt-2">
