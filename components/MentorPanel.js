@@ -313,8 +313,8 @@ const MentorDashboard = ({ currentUser, showToast }) => {
                 setLoading(true);
 
                 // 1. Bizim hazırladığımız gerçek şablonları bulalım
-                const tytBundle = STUDY_TEMPLATES.find(t => t.id === 'bundle_tyt_genel');
-                const aytBundle = STUDY_TEMPLATES.find(t => t.id === 'bundle_ayt_sayisal');
+                const tytBundle = window.STUDY_TEMPLATES ? window.STUDY_TEMPLATES.find(t => t.id === 'bundle_tyt_genel') : null;
+                const aytBundle = window.STUDY_TEMPLATES ? window.STUDY_TEMPLATES.find(t => t.id === 'bundle_ayt_sayisal') : null;
 
                 // Eğer şablonlar tanımlı değilse hata vermesin
                 if (!tytBundle || !aytBundle) {

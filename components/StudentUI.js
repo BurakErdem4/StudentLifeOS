@@ -918,6 +918,8 @@ const STUDY_TEMPLATES = [
     }
 ];
 
+window.STUDY_TEMPLATES = STUDY_TEMPLATES;
+
 const getTemplate = (id) => STUDY_TEMPLATES.find(t => t.id === id);
 
 const PRESET_CATEGORIES = [
