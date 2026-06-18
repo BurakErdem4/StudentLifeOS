@@ -4,7 +4,6 @@
         const DevTools = ({ openConfirm, onSeedMockData }) => {
             const [open, setOpen] = useState(false);
             const [loading, setLoading] = useState(false);
-
             const generateMockData = async () => {
                 if (!openConfirm) return alert('Hata: openConfirm prop eksik!');
                 openConfirm(
@@ -13,15 +12,13 @@
                     async () => {
                         setLoading(true);
 
-                        const classes = ["12-A", "12-B", "11-C", "11-D"];
+                        const classes = ["12-A", "12-B", "11-C", "11-D", "Mezun-1"];
                         const names = ["Ayşe Yılmaz", "Can Demir", "Elif Kara", "Mehmet Çelik", "Zeynep Şahin", "Ali Koç", "Fatma Arslan", "Burak Yıldız", "Seda Polat", "Kerem Aydın", "Deniz Aksoy", "Cem Öztürk", "Ece Güneş", "Onur Kaya", "Selin Yücel", "Mert Doğan", "Buse Şen", "Tolga Kurt", "Gamze Yavuz", "Arda Taş"];
                         const projectTemplates = [
-                            { title: "TYT Matematik", total: 100, unit: "Konu", est: 60 },
-                            { title: "TYT Türkçe", total: 40, unit: "Konu", est: 45 },
-                            { title: "AYT Fizik", total: 50, unit: "Konu", est: 70 },
-                            { title: "Paragraf Çözümü", total: 1000, unit: "Soru", est: 1 },
-                            { title: "Geometri", total: 80, unit: "Konu", est: 60 },
-                            { title: "Almanca A2", total: 100, unit: "Ders", est: 30 }
+                            { title: "TYT Genel Deneme (Puan)", total: 1000, unit: "Puan", est: 135 },
+                            { title: "AYT Sayısal Puan", total: 1000, unit: "Puan", est: 180 },
+                            { title: "Paragraf Soru Kampı", total: 1000, unit: "Soru", est: 1 },
+                            { title: "Matematik Soru Bankası", total: 1000, unit: "Soru", est: 2 }
                         ];
 
                         try {
@@ -42,18 +39,36 @@
                                 const uid = db.ref('users').push().key;
                                 const name = names[i];
                                 const assignedClass = classIds[i % classIds.length];
-                                const performanceProfile = Math.random(); // 0.0 - 1.0 (Low to High performer)
+                                
+                                // Group assignments:
+                                // 0-3: Top performers (Target: 800-950)
+                                // 4-7: Mid-high (Target: 600-750)
+                                // 8-11: Mid-low (Target: 400-550)
+                                // 12-15: Low (Target: 100-250)
+                                // 16-19: Chaotic/Random (Fluctuating, end up 300-600)
+                                
+                                let group = "top";
+                                if (i >= 4 && i <= 7) group = "mid-high";
+                                else if (i >= 8 && i <= 11) group = "mid-low";
+                                else if (i >= 12 && i <= 15) group = "low";
+                                else if (i >= 16) group = "chaotic";
 
                                 // Create Projects for Student
                                 const studentProjects = [];
-                                const numProjects = 4; // Standardize to 4 to look good on chart
-                                const shuffled = [...projectTemplates].sort(() => 0.5 - Math.random());
-                                const selectedTemplates = shuffled.slice(0, numProjects);
+                                const numProjects = 4;
+                                const selectedTemplates = projectTemplates.slice(0, numProjects);
 
-                                // Assign varied target percentages
-                                const targetPercents = [0.15, 0.40, 0.70, 0.95].sort(() => 0.5 - Math.random());
+                                // Base performance targets based on group
+                                let minTarget, maxTarget;
+                                if (group === "top") { minTarget = 800; maxTarget = 950; }
+                                else if (group === "mid-high") { minTarget = 600; maxTarget = 750; }
+                                else if (group === "mid-low") { minTarget = 400; maxTarget = 550; }
+                                else if (group === "low") { minTarget = 100; maxTarget = 250; }
+                                else { minTarget = 300; maxTarget = 600; } // chaotic
 
                                 selectedTemplates.forEach((tmp, idx) => {
+                                    // Slight variance per project
+                                    const t = minTarget + Math.random() * (maxTarget - minTarget);
                                     studentProjects.push({
                                         id: `proj_${Date.now()}_${idx}`,
                                         title: tmp.title,
@@ -61,53 +76,80 @@
                                         currentUnit: 0,
                                         unit: tmp.unit,
                                         totalEstTime: tmp.total * tmp.est,
-                                        targetFinalPercent: targetPercents[idx % targetPercents.length]
+                                        targetFinalValue: t
                                     });
                                 });
 
                                 const history = {};
+                                
+                                // To create slumps/peaks, we divide the 180 days into 6 periods of 30 days
+                                const periodMultipliers = [];
+                                for (let p = 0; p < 6; p++) {
+                                    if (group === "top") periodMultipliers.push(0.8 + Math.random() * 0.4); // 0.8 - 1.2 (Consistent)
+                                    else if (group === "mid-high") periodMultipliers.push(0.6 + Math.random() * 0.6); // 0.6 - 1.2
+                                    else if (group === "mid-low") periodMultipliers.push(0.3 + Math.random() * 0.6); // 0.3 - 0.9
+                                    else if (group === "low") periodMultipliers.push(0.1 + Math.random() * 0.3); // 0.1 - 0.4
+                                    else periodMultipliers.push(Math.random() < 0.5 ? 0.1 : 1.5); // Chaotic! Either dead or working insanely hard
+                                }
 
                                 // 3. Generate History (180 Days Chronological)
                                 for (let d = 179; d >= 0; d--) {
                                     const date = new Date();
                                     date.setDate(date.getDate() - d);
                                     const k = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+                                    
+                                    const currentPeriod = Math.floor((179 - d) / 30);
+                                    const periodMult = periodMultipliers[Math.min(currentPeriod, 5)];
+                                    
+                                    // Does student study today?
+                                    // Top works 95% of days, low works 20%. Chaotic works based on period mult.
+                                    let dailyProb = 0.5;
+                                    if (group === "top") dailyProb = 0.95;
+                                    else if (group === "mid-high") dailyProb = 0.75;
+                                    else if (group === "mid-low") dailyProb = 0.5;
+                                    else if (group === "low") dailyProb = 0.2;
+                                    else dailyProb = periodMult > 0.8 ? 0.8 : 0.1;
 
                                     const tasks = [];
-                                    // Skip some days: "Az da olsa hiç görev verilmeyen" -> ~10% skip
-                                    if (Math.random() > 0.1) {
-                                        // USER REQUEST: Max 3 tasks allowed per day. Min 1.
-                                        const numTasks = 1 + Math.floor(Math.random() * 3); // 1 to 3 tasks
+                                    if (Math.random() < dailyProb) {
+                                        const numTasks = 1 + Math.floor(Math.random() * 3);
 
                                         for (let t = 0; t < numTasks; t++) {
-                                            const isProjectTask = Math.random() < 0.9; // Mostly project tasks
-
-                                            // VARIANCE: "Bazen görevler verilsin ancak yapılmasın"
-                                            // 75% completed, 25% just assigned (0 progress but shows in list)
-                                            const isCompleted = Math.random() < (0.75 + (performanceProfile * 0.1));
+                                            const isProjectTask = Math.random() < 0.8;
+                                            
+                                            // Task completion probability
+                                            const isCompleted = Math.random() < (0.5 + (dailyProb * 0.4)); 
 
                                             let task = {};
                                             if (isProjectTask) {
                                                 const proj = studentProjects[Math.floor(Math.random() * studentProjects.length)];
 
-                                                // Variance: Amount per task
-                                                // Reduced Amounts to ensure it lasts 6 months! 
-                                                // Prev: 7-12 was too high. New: 3-8 for sprint, 1-3 for normal.
+                                                // Calculate amount to add. 
+                                                // 180 days. To reach 800, need ~4.5 points per day if studying every day.
+                                                // So average amount should be around targetFinalValue / (180 * dailyProb * projProb)
+                                                // Let's just use a dynamic amount to ensure they reach near target
+                                                const remainingDays = d + 1;
+                                                const remainingTarget = proj.targetFinalValue - proj.currentUnit;
+                                                
                                                 let amount = 0;
-                                                if (Math.random() > 0.92) {
-                                                    amount = 3 + Math.floor(Math.random() * 6); // Sprint: 3-8 units
-                                                } else {
-                                                    amount = 1 + Math.floor(Math.random() * 3); // Regular: 1-3 units
+                                                if (remainingTarget > 0) {
+                                                    // Daily ideal step
+                                                    const idealStep = remainingTarget / remainingDays;
+                                                    // Multiply by periodMult to get slumps/peaks
+                                                    // Multiply by random 0.5 to 1.5 to add noise
+                                                    amount = idealStep * periodMult * (0.5 + Math.random());
+                                                    
+                                                    // Round up, max 30 per day per project to avoid crazy spikes
+                                                    amount = Math.ceil(amount);
+                                                    if (amount > 30) amount = 30 + Math.floor(Math.random() * 10);
+                                                    if (amount < 1 && remainingTarget > 0) amount = 1;
                                                 }
 
-                                                const targetTotal = proj.totalUnit * proj.targetFinalPercent;
-
-                                                if (isCompleted && proj.currentUnit < targetTotal) {
+                                                if (isCompleted && proj.currentUnit < proj.targetFinalValue) {
                                                     proj.currentUnit = Math.min(proj.totalUnit, proj.currentUnit + amount);
-
                                                     task = {
                                                         id: Date.now() + d * 1000 + t,
-                                                        title: `${proj.title} Çalışması`,
+                                                        title: `${proj.title} Gelişimi`,
                                                         type: 'project_slice',
                                                         pid: proj.id,
                                                         targetAmount: amount,
@@ -115,18 +157,17 @@
                                                         completed: true
                                                     };
                                                 } else {
-                                                    // Task assigned but NOT completed or Limit Reached (Maintenance Study)
                                                     task = {
                                                         id: Date.now() + d * 1000 + t,
-                                                        title: "Tekrar & Etüt", // Fallback title
+                                                        title: "Tekrar & Etüt",
                                                         duration: 45,
-                                                        completed: false // Not completed
+                                                        completed: false
                                                     };
                                                 }
                                             } else {
                                                 task = {
                                                     id: Date.now() + d * 1000 + t,
-                                                    title: ["Kitap Okuma", "Yürüyüş", "Kütüphane", "Paragraf"][Math.floor(Math.random() * 4)],
+                                                    title: ["Kitap Okuma", "Yürüyüş", "Kütüphane", "Paragraf", "Rehberlik"][Math.floor(Math.random() * 5)],
                                                     duration: 30,
                                                     completed: isCompleted
                                                 };
@@ -138,7 +179,7 @@
                                 }
 
                                 // Clean up
-                                studentProjects.forEach(p => delete p.targetFinalPercent);
+                                studentProjects.forEach(p => delete p.targetFinalValue);
 
                                 batch[`users/${uid}`] = {
                                     profile: {
@@ -154,7 +195,8 @@
                                 };
                             }
                             await db.ref().update(batch);
-                            alert("✅ Finance-Style Data SİMÜLASYONU Tamamlandı!\nGrafikler artık gerçekçi borsa benzeri verilerle doldu.");
+                            alert("✅ YKS SİMÜLASYONU Tamamlandı!
+Farklı profillerdeki (11-C, 12-A, Mezun) öğrencilerin 180 günlük borsa benzeri gerçekçi grafikleri yüklendi.");
                         } catch (e) {
                             alert("Hata: " + e.message);
                             console.error(e);
