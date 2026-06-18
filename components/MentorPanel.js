@@ -195,8 +195,7 @@
                                 };
                             }
                             await db.ref().update(batch);
-                            alert("✅ YKS SİMÜLASYONU Tamamlandı!
-Farklı profillerdeki (11-C, 12-A, Mezun) öğrencilerin 180 günlük borsa benzeri gerçekçi grafikleri yüklendi.");
+                            alert("✅ YKS SİMÜLASYONU Tamamlandı!\\nFarklı profillerdeki (11-C, 12-A, Mezun) öğrencilerin 180 günlük borsa benzeri gerçekçi grafikleri yüklendi.");
                         } catch (e) {
                             alert("Hata: " + e.message);
                             console.error(e);
