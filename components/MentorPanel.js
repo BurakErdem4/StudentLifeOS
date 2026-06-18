@@ -1,6 +1,18 @@
 // --- MENTOR PANEL (MentorDashboard + AnalysisView + StudentSimulator + StudentDetailModal) ---
 // Extracted from index.html. Uses globals: db, auth, React, useState, useEffect, Icons
 
+const DevTools = ({ openConfirm, onSeedMockData }) => {
+    return (
+        <button 
+            title="Mock Veri Üret"
+            onClick={() => openConfirm('Mock Veri Üret', 'Rastgele öğrenci verileri oluşturulacak. Emin misiniz?', onSeedMockData, 'warning')}
+            className="flex items-center gap-1 px-3 py-1.5 bg-purple-600/30 hover:bg-purple-600 text-purple-200 text-xs font-bold rounded-lg transition"
+        >
+            🛠 Test Verisi
+        </button>
+    );
+};
+
 const MentorDashboard = ({ currentUser, showToast }) => {
     const [students, setStudents] = useState([]);
     const [classes, setClasses] = useState([]);
