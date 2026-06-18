@@ -1,17 +1,275 @@
 // --- MENTOR PANEL (MentorDashboard + AnalysisView + StudentSimulator + StudentDetailModal) ---
 // Extracted from index.html. Uses globals: db, auth, React, useState, useEffect, Icons
 
-const DevTools = ({ openConfirm, onSeedMockData }) => {
-    return (
-        <button 
-            title="Mock Veri Üret"
-            onClick={() => openConfirm('Mock Veri Üret', 'Rastgele öğrenci verileri oluşturulacak. Emin misiniz?', onSeedMockData, 'warning')}
-            className="flex items-center gap-1 px-3 py-1.5 bg-purple-600/30 hover:bg-purple-600 text-purple-200 text-xs font-bold rounded-lg transition"
-        >
-            🛠 Test Verisi
-        </button>
-    );
-};
+        const DevTools = ({ openConfirm, onSeedMockData }) => {
+            const [open, setOpen] = useState(false);
+            const [loading, setLoading] = useState(false);
+
+            const generateMockData = async () => {
+                if (!openConfirm) return alert('Hata: openConfirm prop eksik!');
+                openConfirm(
+                    '⚠️ DİKKAT: 20 YENİ ÖĞRENCİ OLUŞTURULACAK.',
+                    'Bu işlem veritabanına büyük miktarda veri yazacaktır. Devam et?',
+                    async () => {
+                        setLoading(true);
+
+                        const classes = ["12-A", "12-B", "11-C", "11-D"];
+                        const names = ["Ayşe Yılmaz", "Can Demir", "Elif Kara", "Mehmet Çelik", "Zeynep Şahin", "Ali Koç", "Fatma Arslan", "Burak Yıldız", "Seda Polat", "Kerem Aydın", "Deniz Aksoy", "Cem Öztürk", "Ece Güneş", "Onur Kaya", "Selin Yücel", "Mert Doğan", "Buse Şen", "Tolga Kurt", "Gamze Yavuz", "Arda Taş"];
+                        const projectTemplates = [
+                            { title: "TYT Matematik", total: 100, unit: "Konu", est: 60 },
+                            { title: "TYT Türkçe", total: 40, unit: "Konu", est: 45 },
+                            { title: "AYT Fizik", total: 50, unit: "Konu", est: 70 },
+                            { title: "Paragraf Çözümü", total: 1000, unit: "Soru", est: 1 },
+                            { title: "Geometri", total: 80, unit: "Konu", est: 60 },
+                            { title: "Almanca A2", total: 100, unit: "Ders", est: 30 }
+                        ];
+
+                        try {
+                            // 1. Create Classes
+                            const classUpdates = {};
+                            const classIds = [];
+                            for (let cName of classes) {
+                                const classId = "class_" + cName.replace('-', '');
+                                classUpdates[`users/school_metadata/classes/${classId}`] = { name: cName, studentCount: 0 };
+                                classIds.push({ id: classId, name: cName });
+                            }
+                            await db.ref().update(classUpdates);
+
+                            const batch = {};
+
+                            // 2. Create Students
+                            for (let i = 0; i < 20; i++) {
+                                const uid = db.ref('users').push().key;
+                                const name = names[i];
+                                const assignedClass = classIds[i % classIds.length];
+                                const performanceProfile = Math.random(); // 0.0 - 1.0 (Low to High performer)
+
+                                // Create Projects for Student
+                                const studentProjects = [];
+                                const numProjects = 4; // Standardize to 4 to look good on chart
+                                const shuffled = [...projectTemplates].sort(() => 0.5 - Math.random());
+                                const selectedTemplates = shuffled.slice(0, numProjects);
+
+                                // Assign varied target percentages
+                                const targetPercents = [0.15, 0.40, 0.70, 0.95].sort(() => 0.5 - Math.random());
+
+                                selectedTemplates.forEach((tmp, idx) => {
+                                    studentProjects.push({
+                                        id: `proj_${Date.now()}_${idx}`,
+                                        title: tmp.title,
+                                        totalUnit: tmp.total,
+                                        currentUnit: 0,
+                                        unit: tmp.unit,
+                                        totalEstTime: tmp.total * tmp.est,
+                                        targetFinalPercent: targetPercents[idx % targetPercents.length]
+                                    });
+                                });
+
+                                const history = {};
+
+                                // 3. Generate History (180 Days Chronological)
+                                for (let d = 179; d >= 0; d--) {
+                                    const date = new Date();
+                                    date.setDate(date.getDate() - d);
+                                    const k = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+
+                                    const tasks = [];
+                                    // Skip some days: "Az da olsa hiç görev verilmeyen" -> ~10% skip
+                                    if (Math.random() > 0.1) {
+                                        // USER REQUEST: Max 3 tasks allowed per day. Min 1.
+                                        const numTasks = 1 + Math.floor(Math.random() * 3); // 1 to 3 tasks
+
+                                        for (let t = 0; t < numTasks; t++) {
+                                            const isProjectTask = Math.random() < 0.9; // Mostly project tasks
+
+                                            // VARIANCE: "Bazen görevler verilsin ancak yapılmasın"
+                                            // 75% completed, 25% just assigned (0 progress but shows in list)
+                                            const isCompleted = Math.random() < (0.75 + (performanceProfile * 0.1));
+
+                                            let task = {};
+                                            if (isProjectTask) {
+                                                const proj = studentProjects[Math.floor(Math.random() * studentProjects.length)];
+
+                                                // Variance: Amount per task
+                                                // Reduced Amounts to ensure it lasts 6 months! 
+                                                // Prev: 7-12 was too high. New: 3-8 for sprint, 1-3 for normal.
+                                                let amount = 0;
+                                                if (Math.random() > 0.92) {
+                                                    amount = 3 + Math.floor(Math.random() * 6); // Sprint: 3-8 units
+                                                } else {
+                                                    amount = 1 + Math.floor(Math.random() * 3); // Regular: 1-3 units
+                                                }
+
+                                                const targetTotal = proj.totalUnit * proj.targetFinalPercent;
+
+                                                if (isCompleted && proj.currentUnit < targetTotal) {
+                                                    proj.currentUnit = Math.min(proj.totalUnit, proj.currentUnit + amount);
+
+                                                    task = {
+                                                        id: Date.now() + d * 1000 + t,
+                                                        title: `${proj.title} Çalışması`,
+                                                        type: 'project_slice',
+                                                        pid: proj.id,
+                                                        targetAmount: amount,
+                                                        duration: 40 + Math.floor(Math.random() * 40),
+                                                        completed: true
+                                                    };
+                                                } else {
+                                                    // Task assigned but NOT completed or Limit Reached (Maintenance Study)
+                                                    task = {
+                                                        id: Date.now() + d * 1000 + t,
+                                                        title: "Tekrar & Etüt", // Fallback title
+                                                        duration: 45,
+                                                        completed: false // Not completed
+                                                    };
+                                                }
+                                            } else {
+                                                task = {
+                                                    id: Date.now() + d * 1000 + t,
+                                                    title: ["Kitap Okuma", "Yürüyüş", "Kütüphane", "Paragraf"][Math.floor(Math.random() * 4)],
+                                                    duration: 30,
+                                                    completed: isCompleted
+                                                };
+                                            }
+                                            if (task.id) tasks.push(task);
+                                        }
+                                    }
+                                    if (tasks.length > 0) history[k] = { tasks };
+                                }
+
+                                // Clean up
+                                studentProjects.forEach(p => delete p.targetFinalPercent);
+
+                                batch[`users/${uid}`] = {
+                                    profile: {
+                                        name,
+                                        email: `mock${i}@student.com`,
+                                        role: 'student',
+                                        isMock: true,
+                                        classId: assignedClass.id,
+                                        className: assignedClass.name
+                                    },
+                                    projects: studentProjects,
+                                    history
+                                };
+                            }
+                            await db.ref().update(batch);
+                            alert("✅ Finance-Style Data SİMÜLASYONU Tamamlandı!\nGrafikler artık gerçekçi borsa benzeri verilerle doldu.");
+                        } catch (e) {
+                            alert("Hata: " + e.message);
+                            console.error(e);
+                        } finally {
+                            setLoading(false);
+                        }
+                    }
+                );
+            };
+
+
+            const deleteMockData = async () => {
+                if (!openConfirm) return;
+                openConfirm(
+                    'TÜM Mock öğrencileri silinsin mi?',
+                    'Sadece test amaçlı oluşturulan öğrenciler silinecektir.',
+                    async () => {
+                        setLoading(true);
+                        try {
+                            const snap = await db.ref('users').orderByChild('profile/isMock').equalTo(true).once('value');
+                            const updates = {};
+                            snap.forEach(child => {
+                                updates[`users/${child.key}`] = null;
+                            });
+
+                            // Also remove users with classId === 'mock_class' (Legacy Fix)
+                            const snap2 = await db.ref('users').orderByChild('profile/classId').equalTo('mock_class').once('value');
+                            snap2.forEach(child => {
+                                updates[`users/${child.key}`] = null;
+                            });
+
+                            // Also clear classes?? No, keep school metadata safe or clear? Let's just reset users.
+                            // Ideally we should decrement class counts but this is DEV toggle.
+
+                            if (Object.keys(updates).length > 0) {
+                                await db.ref().update(updates);
+                                alert(`${Object.keys(updates).length} öğrenci silindi.`);
+                            } else {
+                                alert("Mock veri bulunamadı.");
+                            }
+                        } catch (e) {
+                            alert("Silme hatası: " + e.message);
+                        }
+                        setLoading(false);
+                    }
+                );
+            };
+
+            const deleteAllData = async () => {
+                if (!openConfirm) return;
+                openConfirm(
+                    '⚠️ DİKKAT: HER ŞEYİ SİL (Hard Reset)',
+                    'Sadece test verileri DEĞİL, sisteme kayıtlı TÜM ÖĞRENCİLER ve SINIFLAR silinecek.\n\nSizin hesabınız (Mentor) silinmeyecek.\n\nBu işlem geri alınamaz. Emin misin?',
+                    async () => {
+                        setLoading(true);
+                        try {
+                            const updates = {};
+                            // 1. Delete All Classes
+                            updates['users/school_metadata/classes'] = null;
+
+                            // 2. Find and Delete All Students
+                            const usersSnap = await db.ref('users').once('value');
+                            let count = 0;
+                            usersSnap.forEach(snap => {
+                                const u = snap.val();
+                                // Safety check: Don't delete self or non-students if needed.
+                                // But request was "all students".
+                                // Let's assume anyone with role='student' OR anyone who is NOT the current logged in mentor?
+                                // Safer: Delete if role == 'student'.
+                                if (u.profile && u.profile.role === 'student') {
+                                    updates[`users/${snap.key}`] = null;
+                                    count++;
+                                }
+                            });
+
+                            if (Object.keys(updates).length > 0) {
+                                await db.ref().update(updates);
+                                alert(`🧹 Temizlik Tamamlandı!\n- ${count} Öğrenci silindi.\n- Tüm sınıflar silindi.`);
+                            } else {
+                                alert("Silinecek öğrenci veya sınıf bulunamadı.");
+                            }
+
+                        } catch (e) {
+                            alert("Hata: " + e.message);
+                        } finally {
+                            setLoading(false);
+                        }
+                    }
+                );
+            };
+
+            return (
+                <div className="relative">
+                    <button type="button" onClick={() => setOpen(!open)} className="w-8 h-8 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 flex items-center justify-center font-bold text-lg transition border border-gray-200 dark:border-slate-700" title="Developer Tools">🛠️</button>
+                    {open && (
+                        <div className="absolute top-full mt-2 left-0 bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl w-64 border border-gray-200 dark:border-slate-700 z-50 animate-fade-in">
+                            <h4 className="font-bold text-gray-800 dark:text-slate-100 mb-3 border-b pb-2 text-sm">Developer Tools v2.0</h4>
+                            <div className="space-y-2">
+                                <button type="button" disabled={loading} onClick={(e) => { e.preventDefault(); generateMockData(); }} className="w-full py-2 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-bold hover:bg-indigo-100 transition text-left px-3">
+                                    {loading ? '...' : '🛠️ Mock Data Yükle'}
+                                </button>
+                                <button type="button" disabled={loading} onClick={(e) => { e.preventDefault(); deleteMockData(); }} className="w-full py-2 bg-orange-50 text-orange-600 rounded-lg text-[10px] font-bold hover:bg-orange-100 transition text-left px-3">
+                                    {loading ? '...' : '🗑️ Sadece Mock Veriyi Temizle'}
+                                </button>
+                                <div className="h-px bg-gray-200 my-2"></div>
+                                <button type="button" disabled={loading} onClick={(e) => { e.preventDefault(); deleteAllData(); }} className="w-full py-2 bg-red-100 text-red-700 rounded-lg text-[10px] font-bold hover:bg-red-200 transition text-left px-3">
+                                    {loading ? '...' : '🔥 HER ŞEYİ SİL (Hard Reset)'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )
+        };
+
 
 const MentorDashboard = ({ currentUser, showToast }) => {
     const [students, setStudents] = useState([]);
