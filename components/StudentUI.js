@@ -1472,8 +1472,8 @@ const StudentUI = ({
                                             <div className="text-xs text-gray-400 dark:text-slate-400 mt-0.5">{t.duration} dk • {t.targetAmount} adet</div>
                                         </div>
                                         <div className="flex items-center gap-1">
-                                            {!t.subItems.every(Boolean) && (
-                                                <button onClick={() => setFocusMode({ active: true, taskId: t.id, taskTitle: t.title, timeLeft: Math.round(Number(t.duration) / t.subItems.length) * 60, isRunning: true })} className="p-2 text-indigo-300 hover:text-indigo-600">
+                                            {(t.subItems ? !t.subItems.every(Boolean) : !t.completed) && (
+                                                <button onClick={() => setFocusMode({ active: true, taskId: t.id, taskTitle: t.title, timeLeft: Math.round(Number(t.duration) / (t.subItems ? t.subItems.length : 1)) * 60, isRunning: true })} className="p-2 text-indigo-300 hover:text-indigo-600">
                                                     <Icons.Play />
                                                 </button>
                                             )}

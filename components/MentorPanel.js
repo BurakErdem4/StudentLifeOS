@@ -18,7 +18,11 @@
                             { title: "TYT Genel Deneme (Puan)", total: 1000, unit: "Puan", est: 135 },
                             { title: "AYT Sayısal Puan", total: 1000, unit: "Puan", est: 180 },
                             { title: "Paragraf Soru Kampı", total: 1000, unit: "Soru", est: 1 },
-                            { title: "Matematik Soru Bankası", total: 1000, unit: "Soru", est: 2 }
+                            { title: "Matematik Soru Bankası", total: 1000, unit: "Soru", est: 2 },
+                            { title: "Fizik Denemeleri", total: 1000, unit: "Soru", est: 2 },
+                            { title: "Problemler Fasıklü", total: 1000, unit: "Soru", est: 2 },
+                            { title: "Kimya Branş Denemesi", total: 1000, unit: "Soru", est: 2 },
+                            { title: "Geometri Soru Bankası", total: 1000, unit: "Soru", est: 2 }
                         ];
 
                         try {
@@ -55,7 +59,7 @@
 
                                 // Create Projects for Student
                                 const studentProjects = [];
-                                const numProjects = 4;
+                                const numProjects = 8;
                                 const selectedTemplates = projectTemplates.slice(0, numProjects);
 
                                 // Base performance targets based on group
@@ -133,15 +137,17 @@
                                                 
                                                 let amount = 0;
                                                 if (remainingTarget > 0) {
+                                                    // Expected number of times this project will be picked again
+                                                    const expectedPicks = Math.max(1, remainingDays * dailyProb * 0.8 * 0.25);
                                                     // Daily ideal step
-                                                    const idealStep = remainingTarget / remainingDays;
+                                                    const idealStep = remainingTarget / expectedPicks;
                                                     // Multiply by periodMult to get slumps/peaks
                                                     // Multiply by random 0.5 to 1.5 to add noise
                                                     amount = idealStep * periodMult * (0.5 + Math.random());
                                                     
-                                                    // Round up, max 30 per day per project to avoid crazy spikes
+                                                    // Round up, max 50 per day per project to avoid crazy spikes
                                                     amount = Math.ceil(amount);
-                                                    if (amount > 30) amount = 30 + Math.floor(Math.random() * 10);
+                                                    if (amount > 50) amount = 50 + Math.floor(Math.random() * 20);
                                                     if (amount < 1 && remainingTarget > 0) amount = 1;
                                                 }
 
@@ -154,14 +160,16 @@
                                                         pid: proj.id,
                                                         targetAmount: amount,
                                                         duration: 40 + Math.floor(Math.random() * 40),
-                                                        completed: true
+                                                        completed: true,
+                                                        subItems: [true]
                                                     };
                                                 } else {
                                                     task = {
                                                         id: Date.now() + d * 1000 + t,
                                                         title: "Tekrar & Etüt",
                                                         duration: 45,
-                                                        completed: false
+                                                        completed: false,
+                                                        subItems: [false]
                                                     };
                                                 }
                                             } else {
@@ -169,7 +177,8 @@
                                                     id: Date.now() + d * 1000 + t,
                                                     title: ["Kitap Okuma", "Yürüyüş", "Kütüphane", "Paragraf", "Rehberlik"][Math.floor(Math.random() * 5)],
                                                     duration: 30,
-                                                    completed: isCompleted
+                                                    completed: isCompleted,
+                                                    subItems: [isCompleted]
                                                 };
                                             }
                                             if (task.id) tasks.push(task);
