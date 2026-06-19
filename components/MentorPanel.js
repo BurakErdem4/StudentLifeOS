@@ -8,150 +8,161 @@
             const generateMockData = async () => {
                 if (!openConfirm) return alert('Hata: openConfirm prop eksik!');
                 openConfirm(
-                    '⚠️ DİKKAT: 5 YENİ MÜKEMMEL ÖĞRENCİ OLUŞTURULACAK.',
-                    'Bu işlem 5 farklı başarı seviyesinden (Çok Başarılı - Başarısız) özenle hazırlanmış, geçmiş verileriyle birebir senkronize SAYISALCI öğrenciler üretecektir. Devam et?',
+                    '⚠️ DİKKAT: 1 KUSURSUZ ÖRNEK ÖĞRENCİ OLUŞTURULACAK.',
+                    'Bu işlem, tamamen "Hazır Programlar"daki (TYT ve AYT Sayısal Kampı) tüm dersleri içeren 1 adet örnek öğrenci oluşturacaktır. Eylül-Ocak arası TYT, Şubat-Mayıs arası AYT bitecek şekilde geçmiş verisi mükemmel senkronizasyonla işlenecektir. Devam et?',
                     async () => {
                         setLoading(true);
 
-                        const projectTemplates = [
-                            { title: "TYT Konu", total: 400, unit: "Konu", est: 45 },
-                            { title: "TYT Soru", total: 15000, unit: "Soru", est: 2 },
-                            { title: "AYT Konu", total: 300, unit: "Konu", est: 60 },
-                            { title: "AYT Soru", total: 12000, unit: "Soru", est: 3 },
-                            { title: "Deneme Sınavları", total: 120, unit: "Deneme", est: 135 }
+                        const tytKonu = [
+                            { title: 'TYT Matematik (Konu)', totalUnit: 80, unit: 'Kısım', totalEstTime: 40 },
+                            { title: 'TYT-AYT Geometri (Konu)', totalUnit: 70, unit: 'Kısım', totalEstTime: 30 },
+                            { title: 'TYT Fizik (Konu)', totalUnit: 40, unit: 'Kısım', totalEstTime: 20 },
+                            { title: 'TYT Kimya (Konu)', totalUnit: 40, unit: 'Kısım', totalEstTime: 17.5 },
+                            { title: 'TYT Biyoloji (Konu)', totalUnit: 40, unit: 'Kısım', totalEstTime: 15 },
+                            { title: 'TYT Türkçe (Konu)', totalUnit: 50, unit: 'Kısım', totalEstTime: 20 },
+                            { title: 'TYT Sosyal (Konu)', totalUnit: 70, unit: 'Kısım', totalEstTime: 15 }
                         ];
 
-                        const profiles = [
-                            { name: "Ali Yılmaz (Çok Başarılı)", group: "top", classId: "class_12a" },
-                            { name: "Zeynep Kaya (İyi Başarılı)", group: "high", classId: "class_12a" },
-                            { name: "Burak Demir (Orta)", group: "mid", classId: "class_12a" },
-                            { name: "Ayşe Çelik (Az Başarılı)", group: "low", classId: "class_12a" },
-                            { name: "Mehmet Şahin (Başarısız)", group: "poor", classId: "class_12a" }
+                        const tytSoru = [
+                            { title: 'TYT Matematik', totalUnit: 400, unit: 'Sayfa', totalEstTime: 80 },
+                            { title: 'TYT-AYT Geometri', totalUnit: 350, unit: 'Sayfa', totalEstTime: 60 },
+                            { title: 'TYT Fizik', totalUnit: 200, unit: 'Sayfa', totalEstTime: 40 },
+                            { title: 'TYT Kimya', totalUnit: 200, unit: 'Sayfa', totalEstTime: 35 },
+                            { title: 'TYT Biyoloji', totalUnit: 200, unit: 'Sayfa', totalEstTime: 30 },
+                            { title: 'TYT Türkçe', totalUnit: 250, unit: 'Sayfa', totalEstTime: 40 },
+                            { title: 'TYT Sosyal (Tarih-Coğ-Fel)', totalUnit: 350, unit: 'Sayfa', totalEstTime: 30 }
+                        ];
+
+                        const aytKonu = [
+                            { title: 'AYT Matematik (Konu)', totalUnit: 90, unit: 'Kısım', totalEstTime: 50 },
+                            { title: 'AYT Fizik (Konu)', totalUnit: 60, unit: 'Kısım', totalEstTime: 35 },
+                            { title: 'AYT Kimya (Konu)', totalUnit: 60, unit: 'Kısım', totalEstTime: 32.5 },
+                            { title: 'AYT Biyoloji (Konu)', totalUnit: 60, unit: 'Kısım', totalEstTime: 30 }
+                        ];
+
+                        const aytSoru = [
+                            { title: 'AYT Matematik', totalUnit: 450, unit: 'Sayfa', totalEstTime: 100 },
+                            { title: 'AYT Fizik', totalUnit: 300, unit: 'Sayfa', totalEstTime: 70 },
+                            { title: 'AYT Kimya', totalUnit: 300, unit: 'Sayfa', totalEstTime: 65 },
+                            { title: 'AYT Biyoloji', totalUnit: 300, unit: 'Sayfa', totalEstTime: 60 }
+                        ];
+
+                        const allProjects = [
+                            ...tytKonu.map(p => ({ ...p, phase: 'TYT' })),
+                            ...tytSoru.map(p => ({ ...p, phase: 'TYT' })),
+                            ...aytKonu.map(p => ({ ...p, phase: 'AYT' })),
+                            ...aytSoru.map(p => ({ ...p, phase: 'AYT' }))
                         ];
 
                         try {
-                            // 1. Create Class
                             const classUpdates = {
-                                'users/school_metadata/classes/class_12a': { name: "12-A Sayısal", studentCount: 5 }
+                                'users/school_metadata/classes/class_12a': { name: "12-A Sayısal", studentCount: 1 }
                             };
                             await db.ref().update(classUpdates);
 
-                            const batch = {};
+                            const uid = db.ref('users').push().key;
 
-                            // 2. Create Students
-                            for (let i = 0; i < profiles.length; i++) {
-                                const uid = db.ref('users').push().key;
-                                const prof = profiles[i];
-                                
-                                const studentProjects = projectTemplates.map((tmp, idx) => ({
-                                    id: `proj_${Date.now()}_${idx}`,
-                                    title: tmp.title,
-                                    totalUnit: tmp.total,
-                                    currentUnit: 0,
-                                    unit: tmp.unit,
-                                    totalEstTime: tmp.total * tmp.est
-                                }));
+                            const studentProjects = allProjects.map((tmp, idx) => ({
+                                id: `proj_mock_${idx}`,
+                                title: tmp.title,
+                                totalUnit: tmp.totalUnit,
+                                currentUnit: 0,
+                                unit: tmp.unit,
+                                totalEstTime: tmp.totalEstTime,
+                                phase: tmp.phase
+                            }));
 
-                                const finalRatios = {
-                                    "top": { min: 0.85, max: 0.98, prob: 0.90 },
-                                    "high": { min: 0.70, max: 0.85, prob: 0.75 },
-                                    "mid": { min: 0.45, max: 0.65, prob: 0.50 },
-                                    "low": { min: 0.25, max: 0.40, prob: 0.35 },
-                                    "poor": { min: 0.05, max: 0.15, prob: 0.15 }
-                                };
-                                
-                                const ratio = finalRatios[prof.group];
-                                
-                                // Determine final target sum for each project
-                                const targetValues = studentProjects.map(p => {
-                                    const finalRatio = ratio.min + Math.random() * (ratio.max - ratio.min);
-                                    return Math.floor(p.totalUnit * finalRatio);
-                                });
+                            // Generate History for 280 Days (Mid-Sept to Mid-June)
+                            const TOTAL_DAYS = 280;
+                            const TYT_DAYS = 140; // First 140 days
+                            
+                            const projectTasks = studentProjects.map(() => ({}));
 
-                                // Distribute work over 180 days
-                                let studyDays = [];
-                                for (let d = 179; d >= 0; d--) {
-                                    let currentProb = ratio.prob;
-                                    // Add some realistic behavior
-                                    if (prof.group === "mid" && (d > 60 && d < 120)) currentProb = 0.25; // Slump in the middle
-                                    if (prof.group === "low" && d < 90) currentProb = 0.1; // Gives up halfway
-                                    
-                                    if (Math.random() < currentProb) {
-                                        studyDays.push(d);
-                                    }
+                            studentProjects.forEach((p, pIdx) => {
+                                let remaining = p.totalUnit;
+                                
+                                // Pick allowed days for this phase
+                                let allowedDays = [];
+                                for (let d = TOTAL_DAYS - 1; d >= 0; d--) {
+                                    const isTYTPhase = d >= (TOTAL_DAYS - TYT_DAYS); // d=279 is 280 days ago
+                                    if (p.phase === 'TYT' && isTYTPhase) allowedDays.push(d);
+                                    if (p.phase === 'AYT' && !isTYTPhase) allowedDays.push(d);
                                 }
 
-                                // Chunk work per day
-                                const projectTasks = studentProjects.map(() => ({})); 
-                                studentProjects.forEach((p, pIdx) => {
-                                    let remaining = targetValues[pIdx];
-                                    let maxChunk = Math.max(1, Math.ceil(p.totalUnit * 0.025)); 
-                                    if (p.unit === "Deneme") maxChunk = 2; // Can't do 10 denemes a day
-                                    if (p.unit === "Konu") maxChunk = 5;
+                                // We want to distribute `remaining` over `allowedDays`
+                                // He studies most days (90% probability)
+                                let studyDays = allowedDays.filter(() => Math.random() < 0.9);
+                                if (studyDays.length === 0) studyDays = allowedDays; // fallback
 
-                                    while (remaining > 0 && studyDays.length > 0) {
-                                        const d = studyDays[Math.floor(Math.random() * studyDays.length)];
-                                        let chunk = Math.min(remaining, Math.ceil(Math.random() * maxChunk));
-                                        
-                                        if (!projectTasks[pIdx][d]) projectTasks[pIdx][d] = 0;
-                                        projectTasks[pIdx][d] += chunk;
-                                        remaining -= chunk;
-                                    }
-                                });
-
-                                const history = {};
-                                for (let d = 179; d >= 0; d--) {
-                                    const date = new Date();
-                                    date.setDate(date.getDate() - d);
-                                    const k = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+                                let maxChunk = p.unit === 'Kısım' ? 3 : 15; // Realistic daily chunks
+                                
+                                while (remaining > 0 && studyDays.length > 0) {
+                                    const dayIdx = Math.floor(Math.random() * studyDays.length);
+                                    const d = studyDays[dayIdx];
+                                    let chunk = Math.min(remaining, Math.ceil(Math.random() * maxChunk));
                                     
-                                    const tasksForDay = [];
-                                    let taskCounter = 0;
-                                    studentProjects.forEach((p, pIdx) => {
-                                        if (projectTasks[pIdx][d] > 0) {
-                                            const amount = projectTasks[pIdx][d];
-                                            tasksForDay.push({
-                                                id: Date.now() + d * 1000 + (taskCounter++),
-                                                title: `${p.title} Çalışması`,
-                                                type: 'project_slice',
-                                                pid: p.id,
-                                                targetAmount: amount,
-                                                duration: p.unit === "Soru" ? Math.max(30, amount * 2) : p.unit === "Deneme" ? amount * 150 : amount * 45,
-                                                completed: true,
-                                                subItems: [true]
-                                            });
-                                        }
-                                    });
-                                    
-                                    if (tasksForDay.length > 0) {
-                                        history[k] = { tasks: tasksForDay };
-                                    }
+                                    if (!projectTasks[pIdx][d]) projectTasks[pIdx][d] = 0;
+                                    projectTasks[pIdx][d] += chunk;
+                                    remaining -= chunk;
                                 }
+                            });
 
-                                // Sync exact completed amounts
+                            const history = {};
+                            for (let d = TOTAL_DAYS - 1; d >= 0; d--) {
+                                const date = new Date();
+                                date.setDate(date.getDate() - d);
+                                const k = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+                                
+                                const tasksForDay = [];
+                                let taskCounter = 0;
                                 studentProjects.forEach((p, pIdx) => {
-                                    let totalDone = 0;
-                                    if (projectTasks[pIdx]) {
-                                        Object.values(projectTasks[pIdx]).forEach(amt => totalDone += amt);
+                                    if (projectTasks[pIdx][d] > 0) {
+                                        const amount = projectTasks[pIdx][d];
+                                        tasksForDay.push({
+                                            id: `task_${d}_${taskCounter++}`,
+                                            title: `${p.title} Çalışması`,
+                                            type: 'project_slice',
+                                            pid: p.id,
+                                            targetAmount: amount,
+                                            duration: p.unit === "Kısım" ? amount * 30 : amount * 5, // Estimate 30m per Kısım, 5m per Sayfa
+                                            completed: true,
+                                            subItems: [true]
+                                        });
                                     }
-                                    p.currentUnit = totalDone;
                                 });
+                                
+                                if (tasksForDay.length > 0) {
+                                    history[k] = { tasks: tasksForDay };
+                                }
+                            }
 
-                                batch[`users/${uid}`] = {
+                            // Sync exact completed amounts
+                            studentProjects.forEach((p, pIdx) => {
+                                let totalDone = 0;
+                                if (projectTasks[pIdx]) {
+                                    Object.values(projectTasks[pIdx]).forEach(amt => totalDone += amt);
+                                }
+                                p.currentUnit = totalDone;
+                                delete p.phase; // cleanup
+                            });
+
+                            const batch = {
+                                [`users/${uid}`]: {
                                     profile: {
-                                        name: prof.name,
-                                        email: `mock_${prof.group}@student.com`,
+                                        name: "Ali Yılmaz (Örnek Öğrenci)",
+                                        email: "mock_ornek@student.com",
                                         role: 'student',
                                         isMock: true,
-                                        classId: prof.classId,
+                                        classId: "class_12a",
                                         className: "12-A Sayısal"
                                     },
                                     projects: studentProjects,
                                     history
-                                };
-                            }
+                                }
+                            };
+                            
                             await db.ref().update(batch);
-                            alert("✅ Mükemmel YKS Simülasyonu Tamamlandı!\nTam 5 adet özenle hazırlanmış sayısal öğrenci eklendi. Tüm geçmiş veriler hedeflerle %100 uyumludur.");
+                            alert("✅ Kusursuz Örnek Öğrenci Oluşturuldu!\n\nHazır programlardaki tüm TYT ve AYT dersleri eklendi. Eylül'den Ocak sonuna kadar TYT, Şubat'tan Haziran'a kadar AYT görevleri eksiksiz bir şekilde geçmiş grafiklerine ve hedeflere senkronize edildi.");
                         } catch (e) {
                             alert("Hata: " + e.message);
                             console.error(e);
