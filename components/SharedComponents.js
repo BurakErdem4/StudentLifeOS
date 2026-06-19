@@ -34,6 +34,7 @@ const ProjectAnalyticsChart = ({ student }) => {
         if (range === '1m') days = 30;
         if (range === '3m') days = 90;
         if (range === '6m') days = 180;
+        if (range === '1y') days = 365;
 
         const now = new Date();
         const endDate = new Date(now);
@@ -188,6 +189,7 @@ const ProjectAnalyticsChart = ({ student }) => {
             if (range === '1m') baseRange = 15;
             if (range === '3m') baseRange = 40;
             if (range === '6m') baseRange = 80;
+            if (range === '1y') baseRange = 100;
             const actualDelta = currentMax - startValue;
             let targetRange = baseRange;
             let attempts = 0;
@@ -239,11 +241,11 @@ const ProjectAnalyticsChart = ({ student }) => {
                     </div>
                 </div>
                 <div className="flex bg-gray-800 rounded-lg p-1 items-center">
-                    <button onClick={() => setChartOffset(c => c - 1)} className="px-2 py-1 text-gray-400 hover:text-white transition">←</button>
-                    {['1w', '1m', '3m', '6m'].map(r => (
-                        <button key={r} onClick={() => setRange(r)} className={`px-3 py-1 text-[10px] font-bold rounded-md transition ${range === r ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}>{r.toUpperCase()}</button>
+                    <button onClick={() => setChartOffset(c => c - 1)} className="px-4 py-2 text-gray-400 hover:text-white transition">←</button>
+                    {['1w', '1m', '3m', '6m', '1y'].map(r => (
+                        <button key={r} onClick={() => setRange(r)} className={`px-8 py-2 text-xs font-bold rounded-md transition ${range === r ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}>{r.toUpperCase()}</button>
                     ))}
-                    <button disabled={chartOffset === 0} onClick={() => setChartOffset(c => c + 1)} className={`px-2 py-1 transition ${chartOffset === 0 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white'}`}>→</button>
+                    <button disabled={chartOffset === 0} onClick={() => setChartOffset(c => c + 1)} className={`px-4 py-2 transition ${chartOffset === 0 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white'}`}>→</button>
                 </div>
             </div>
             <div className="relative h-[500px] w-full mb-4"><canvas ref={canvasRef} /></div>
