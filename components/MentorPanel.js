@@ -56,101 +56,117 @@
 
                         try {
                             const classUpdates = {
-                                'users/school_metadata/classes/class_12a': { name: "12-A Sayısal", studentCount: 1 }
+                                'users/school_metadata/classes/class_12a': { name: "12-A Sayısal", studentCount: 2 }
                             };
                             await db.ref().update(classUpdates);
 
-                            const uid = db.ref('users').push().key;
+                            const batch = {};
 
-                            const studentProjects = allProjects.map((tmp, idx) => ({
-                                id: `proj_mock_${idx}`,
-                                title: tmp.title,
-                                totalUnit: tmp.totalUnit,
-                                currentUnit: 0,
-                                unit: tmp.unit,
-                                totalEstTime: tmp.totalEstTime,
-                                phase: tmp.phase
-                            }));
+                            const profilesToCreate = [
+                                { name: "Ali Yılmaz (Örnek Öğrenci)", email: "mock_ornek@student.com", ratio: 1.0 },
+                                { name: "Zeynep Kaya (İyi Öğrenci)", email: "mock_iyi@student.com", ratio: 0.82 }
+                            ];
 
-                            // Generate History for 280 Days (Mid-Sept to Mid-June)
-                            const TOTAL_DAYS = 280;
-                            const TYT_DAYS = 140; // First 140 days
-                            
-                            const projectTasks = studentProjects.map(() => ({}));
+                            for (const profile of profilesToCreate) {
+                                const uid = db.ref('users').push().key;
 
-                            studentProjects.forEach((p, pIdx) => {
-                                let remaining = p.totalUnit;
-                                
-                                // Pick allowed days for this phase
-                                let allowedDays = [];
-                                for (let d = TOTAL_DAYS - 1; d >= 0; d--) {
-                                    const isTYTPhase = d >= (TOTAL_DAYS - TYT_DAYS); // d=279 is 280 days ago
-                                    if (p.phase === 'TYT' && isTYTPhase) allowedDays.push(d);
-                                    if (p.phase === 'AYT' && !isTYTPhase) allowedDays.push(d);
-                                }
-
-                                // We want to distribute `remaining` over `allowedDays`
-                                // He studies most days (90% probability)
-                                let studyDays = allowedDays.filter(() => Math.random() < 0.9);
-                                if (studyDays.length === 0) studyDays = allowedDays; // fallback
-
-                                let maxChunk = p.unit === 'Kısım' ? 3 : 15; // Realistic daily chunks
-                                
-                                while (remaining > 0 && studyDays.length > 0) {
-                                    const dayIdx = Math.floor(Math.random() * studyDays.length);
-                                    const d = studyDays[dayIdx];
-                                    let chunk = Math.min(remaining, Math.ceil(Math.random() * maxChunk));
+                                const studentProjects = allProjects.map((tmp, idx) => {
+                                    let personalRatio = profile.ratio;
+                                    if (profile.ratio < 1.0) {
+                                        personalRatio = 0.60 + Math.random() * 0.35; // 0.60 ile 0.95 arası
+                                    }
                                     
-                                    if (!projectTasks[pIdx][d]) projectTasks[pIdx][d] = 0;
-                                    projectTasks[pIdx][d] += chunk;
-                                    remaining -= chunk;
-                                }
-                            });
+                                    return {
+                                        id: `proj_mock_${idx}`,
+                                        title: tmp.title,
+                                        totalUnit: tmp.totalUnit,
+                                        targetToReach: Math.round(tmp.totalUnit * personalRatio),
+                                        currentUnit: 0,
+                                        unit: tmp.unit,
+                                        totalEstTime: tmp.totalEstTime,
+                                        phase: tmp.phase
+                                    };
+                                });
 
-                            const history = {};
-                            for (let d = TOTAL_DAYS - 1; d >= 0; d--) {
-                                const date = new Date();
-                                date.setDate(date.getDate() - d);
-                                const k = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+                                // Generate History for 280 Days (Mid-Sept to Mid-June)
+                                const TOTAL_DAYS = 280;
+                                const TYT_DAYS = 140; // First 140 days
                                 
-                                const tasksForDay = [];
-                                let taskCounter = 0;
+                                const projectTasks = studentProjects.map(() => ({}));
+
                                 studentProjects.forEach((p, pIdx) => {
-                                    if (projectTasks[pIdx][d] > 0) {
-                                        const amount = projectTasks[pIdx][d];
-                                        tasksForDay.push({
-                                            id: `task_${d}_${taskCounter++}`,
-                                            title: `${p.title} Çalışması`,
-                                            type: 'project_slice',
-                                            pid: p.id,
-                                            targetAmount: amount,
-                                            duration: p.unit === "Kısım" ? amount * 30 : amount * 5, // Estimate 30m per Kısım, 5m per Sayfa
-                                            completed: true,
-                                            subItems: Array(amount).fill(true)
-                                        });
+                                    let remaining = p.targetToReach;
+                                    
+                                    // Pick allowed days for this phase
+                                    let allowedDays = [];
+                                    for (let d = TOTAL_DAYS - 1; d >= 0; d--) {
+                                        const isTYTPhase = d >= (TOTAL_DAYS - TYT_DAYS); // d=279 is 280 days ago
+                                        if (p.phase === 'TYT' && isTYTPhase) allowedDays.push(d);
+                                        if (p.phase === 'AYT' && !isTYTPhase) allowedDays.push(d);
+                                    }
+
+                                    // He/she studies most days
+                                    let studyProb = profile.ratio === 1.0 ? 0.9 : 0.75;
+                                    let studyDays = allowedDays.filter(() => Math.random() < studyProb);
+                                    if (studyDays.length === 0) studyDays = allowedDays; // fallback
+
+                                    let maxChunk = p.unit === 'Kısım' ? 3 : 15; // Realistic daily chunks
+                                    
+                                    while (remaining > 0 && studyDays.length > 0) {
+                                        const dayIdx = Math.floor(Math.random() * studyDays.length);
+                                        const d = studyDays[dayIdx];
+                                        let chunk = Math.min(remaining, Math.ceil(Math.random() * maxChunk));
+                                        
+                                        if (!projectTasks[pIdx][d]) projectTasks[pIdx][d] = 0;
+                                        projectTasks[pIdx][d] += chunk;
+                                        remaining -= chunk;
                                     }
                                 });
-                                
-                                if (tasksForDay.length > 0) {
-                                    history[k] = { tasks: tasksForDay };
-                                }
-                            }
 
-                            // Sync exact completed amounts
-                            studentProjects.forEach((p, pIdx) => {
-                                let totalDone = 0;
-                                if (projectTasks[pIdx]) {
-                                    Object.values(projectTasks[pIdx]).forEach(amt => totalDone += amt);
+                                const history = {};
+                                for (let d = TOTAL_DAYS - 1; d >= 0; d--) {
+                                    const date = new Date();
+                                    date.setDate(date.getDate() - d);
+                                    const k = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+                                    
+                                    const tasksForDay = [];
+                                    let taskCounter = 0;
+                                    studentProjects.forEach((p, pIdx) => {
+                                        if (projectTasks[pIdx][d] > 0) {
+                                            const amount = projectTasks[pIdx][d];
+                                            tasksForDay.push({
+                                                id: `task_${d}_${taskCounter++}`,
+                                                title: `${p.title} Çalışması`,
+                                                type: 'project_slice',
+                                                pid: p.id,
+                                                targetAmount: amount,
+                                                duration: p.unit === "Kısım" ? amount * 30 : amount * 5,
+                                                completed: true,
+                                                subItems: Array(amount).fill(true)
+                                            });
+                                        }
+                                    });
+                                    
+                                    if (tasksForDay.length > 0) {
+                                        history[k] = { tasks: tasksForDay };
+                                    }
                                 }
-                                p.currentUnit = totalDone;
-                                delete p.phase; // cleanup
-                            });
 
-                            const batch = {
-                                [`users/${uid}`]: {
+                                // Sync exact completed amounts
+                                studentProjects.forEach((p, pIdx) => {
+                                    let totalDone = 0;
+                                    if (projectTasks[pIdx]) {
+                                        Object.values(projectTasks[pIdx]).forEach(amt => totalDone += amt);
+                                    }
+                                    p.currentUnit = totalDone;
+                                    delete p.phase; // cleanup
+                                    delete p.targetToReach; // cleanup
+                                });
+
+                                batch[`users/${uid}`] = {
                                     profile: {
-                                        name: "Ali Yılmaz (Örnek Öğrenci)",
-                                        email: "mock_ornek@student.com",
+                                        name: profile.name,
+                                        email: profile.email,
                                         role: 'student',
                                         isMock: true,
                                         classId: "class_12a",
@@ -158,11 +174,11 @@
                                     },
                                     projects: studentProjects,
                                     history
-                                }
-                            };
+                                };
+                            }
                             
                             await db.ref().update(batch);
-                            alert("✅ Kusursuz Örnek Öğrenci Oluşturuldu!\n\nHazır programlardaki tüm TYT ve AYT dersleri eklendi. Eylül'den Ocak sonuna kadar TYT, Şubat'tan Haziran'a kadar AYT görevleri eksiksiz bir şekilde geçmiş grafiklerine ve hedeflere senkronize edildi.");
+                            alert("✅ Kusursuz 2 Örnek Öğrenci Oluşturuldu!\n\n%100 başarılı 'Ali Yılmaz' ve %60-95 arası değişken başarı oranlarına sahip 'Zeynep Kaya' eklendi. Her iki öğrencinin de TYT ve AYT grafikleri tamamen senkronizedir.");
                         } catch (e) {
                             alert("Hata: " + e.message);
                             console.error(e);
