@@ -56,7 +56,7 @@
 
                         try {
                             const classUpdates = {
-                                'users/school_metadata/classes/class_12a': { name: "12-A Sayısal", studentCount: 2 }
+                                'users/school_metadata/classes/class_12a': { name: "12-A Sayısal", studentCount: 6 }
                             };
                             await db.ref().update(classUpdates);
 
@@ -64,7 +64,11 @@
 
                             const profilesToCreate = [
                                 { name: "Ali Yılmaz (Örnek Öğrenci)", email: "mock_ornek@student.com", ratio: 1.0 },
-                                { name: "Zeynep Kaya (İyi Öğrenci)", email: "mock_iyi@student.com", ratio: 0.82 }
+                                { name: "Zeynep Kaya (İyi Öğrenci)", email: "mock_iyi@student.com", ratio: 0.82 },
+                                { name: "Burak Demir (Orta Öğrenci)", email: "mock_orta@student.com", ratio: 0.65 },
+                                { name: "Ayşe Çelik (Az Başarılı)", email: "mock_az@student.com", ratio: 0.50 },
+                                { name: "Mehmet Şahin (Zayıf Öğrenci)", email: "mock_zayif@student.com", ratio: 0.35 },
+                                { name: "Can Yücel (Çok Zayıf Öğrenci)", email: "mock_cokzayif@student.com", ratio: 0.10 }
                             ];
 
                             for (const profile of profilesToCreate) {
@@ -73,7 +77,9 @@
                                 const studentProjects = allProjects.map((tmp, idx) => {
                                     let personalRatio = profile.ratio;
                                     if (profile.ratio < 1.0) {
-                                        personalRatio = 0.60 + Math.random() * 0.35; // 0.60 ile 0.95 arası
+                                        // +/- 15% varyasyon
+                                        let variance = (Math.random() * 0.30) - 0.15;
+                                        personalRatio = Math.max(0, Math.min(1, profile.ratio + variance));
                                     }
                                     
                                     return {
@@ -105,8 +111,8 @@
                                         if (p.phase === 'AYT' && !isTYTPhase) allowedDays.push(d);
                                     }
 
-                                    // He/she studies most days
-                                    let studyProb = profile.ratio === 1.0 ? 0.9 : 0.75;
+                                    // Çalışma istikrarı başarı oranına paralel
+                                    let studyProb = Math.max(0.1, Math.min(0.9, profile.ratio));
                                     let studyDays = allowedDays.filter(() => Math.random() < studyProb);
                                     if (studyDays.length === 0) studyDays = allowedDays; // fallback
 
