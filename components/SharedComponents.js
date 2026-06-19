@@ -57,6 +57,7 @@ const ProjectAnalyticsChart = ({ student }) => {
                 borderWidth: 2,
                 pointRadius: 0,
                 pointHoverRadius: 6,
+                pointHitRadius: 15,
                 tension: 0.4,
                 currentRawTotal: 0
             };
@@ -164,7 +165,7 @@ const ProjectAnalyticsChart = ({ student }) => {
             data: { labels, datasets: filteredDatasets },
             options: {
                 responsive: true, maintainAspectRatio: false,
-                interaction: { mode: 'index', intersect: false },
+                interaction: { mode: 'nearest', intersect: true },
                 scales: {
                     y: { beginAtZero: metric === 'velocity', min: yMin, max: yMax, suggestedMax: metric === 'velocity' ? 12 : undefined, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' }, border: { display: false } },
                     x: { grid: { display: false }, ticks: { color: '#9ca3af' }, border: { display: false } }
