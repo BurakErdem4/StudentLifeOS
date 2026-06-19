@@ -246,7 +246,7 @@ const ProjectAnalyticsChart = ({ student }) => {
                     <button disabled={chartOffset === 0} onClick={() => setChartOffset(c => c + 1)} className={`px-2 py-1 transition ${chartOffset === 0 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white'}`}>→</button>
                 </div>
             </div>
-            <div className="relative h-64 w-full mb-4"><canvas ref={canvasRef} /></div>
+            <div className="relative h-[500px] w-full mb-4"><canvas ref={canvasRef} /></div>
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 border-t border-gray-800/50 pt-4">
                 <button onClick={() => setActiveFilter('ALL')} className={`flex-none px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${activeFilter === 'ALL' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'bg-gray-800 text-gray-500 hover:bg-gray-700'}`}>
                     <span className="text-lg leading-3">⌘</span> Tümü
