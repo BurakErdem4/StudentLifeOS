@@ -1467,7 +1467,7 @@ const AnalysisView = ({ student }) => {
     const daysList = getPaginatedDays();
 
     return (
-        <div className="space-y-6 max-w-2xl mx-auto">
+        <div className="space-y-6 max-w-6xl mx-auto">
             {/* 10 Günlük Çizelge */}
             <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700">
                 <div className="flex justify-between items-center mb-4">
