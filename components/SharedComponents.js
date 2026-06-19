@@ -126,7 +126,47 @@ const ProjectAnalyticsChart = ({ student }) => {
 
         let filteredDatasets = Object.values(projectData);
         if (activeFilter !== 'ALL') {
-            filteredDatasets = filteredDatasets.filter(ds => String(ds.id).replace("ID_", "") === String(activeFilter).replace("ID_", ""));
+            if (activeFilter.startsWith('CAT_DETAILS_')) {
+                const cat = activeFilter.replace('CAT_DETAILS_', '');
+                filteredDatasets = filteredDatasets.filter(ds => {
+                    const p = student.projects.find(proj => proj.id === ds.id);
+                    return p && p.category === cat;
+                });
+            } else if (activeFilter.startsWith('CAT_')) {
+                const cat = activeFilter.replace('CAT_', '');
+                const projsInCat = student.projects.filter(p => p.category === cat);
+                const dsIds = projsInCat.map(p => p.id);
+                const relatedDs = filteredDatasets.filter(ds => dsIds.includes(ds.id));
+                
+                if (relatedDs.length > 0) {
+                    const aggData = [];
+                    for (let i = 0; i < allDates.length; i++) {
+                        let sum = 0;
+                        relatedDs.forEach(ds => { sum += ds.data[i] || 0; });
+                        aggData.push(sum / relatedDs.length);
+                    }
+                    
+                    filteredDatasets = [{
+                        id: `AGG_${cat}`,
+                        label: `${cat} (Genel Ort.)`,
+                        data: aggData,
+                        rawValues: aggData,
+                        totalUnit: 100,
+                        unit: '%',
+                        borderColor: '#8b5cf6',
+                        backgroundColor: '#8b5cf620',
+                        borderWidth: 3,
+                        pointRadius: 0,
+                        pointHoverRadius: 6,
+                        pointHitRadius: 15,
+                        tension: 0.4
+                    }];
+                } else {
+                    filteredDatasets = [];
+                }
+            } else {
+                filteredDatasets = filteredDatasets.filter(ds => String(ds.id).replace("ID_", "") === String(activeFilter).replace("ID_", ""));
+            }
         }
 
         if (chartInstance.current) chartInstance.current.destroy();
@@ -211,6 +251,35 @@ const ProjectAnalyticsChart = ({ student }) => {
                 <button onClick={() => setActiveFilter('ALL')} className={`flex-none px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${activeFilter === 'ALL' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'bg-gray-800 text-gray-500 hover:bg-gray-700'}`}>
                     <span className="text-lg leading-3">⌘</span> Tümü
                 </button>
+                
+                {(() => {
+                    const categories = [...new Set(student.projects.map(p => p.category).filter(Boolean))];
+                    return (
+                        <>
+                            {categories.map((cat) => {
+                                const isActive = activeFilter === `CAT_${cat}`;
+                                return (
+                                    <button key={`CAT_${cat}`} onClick={() => setActiveFilter(`CAT_${cat}`)}
+                                        className={`flex-none px-4 py-2 rounded-lg text-xs font-bold transition border border-transparent ${isActive ? 'bg-purple-900/50 text-purple-300 ring-1 ring-purple-500/50' : 'bg-gray-800/80 text-gray-400 hover:bg-gray-700'}`}
+                                    >
+                                        📁 {cat} (Genel)
+                                    </button>
+                                );
+                            })}
+                            {categories.map((cat) => {
+                                const isActive = activeFilter === `CAT_DETAILS_${cat}`;
+                                return (
+                                    <button key={`CAT_DETAILS_${cat}`} onClick={() => setActiveFilter(`CAT_DETAILS_${cat}`)}
+                                        className={`flex-none px-4 py-2 rounded-lg text-xs font-bold transition border border-transparent ${isActive ? 'bg-blue-900/50 text-blue-300 ring-1 ring-blue-500/50' : 'bg-gray-800/80 text-gray-400 hover:bg-gray-700'}`}
+                                    >
+                                        📑 {cat} (İçerikli)
+                                    </button>
+                                );
+                            })}
+                        </>
+                    );
+                })()}
+
                 {student.projects.map((p, i) => {
                     const color = colors[i % colors.length];
                     const isActive = activeFilter === p.id;
