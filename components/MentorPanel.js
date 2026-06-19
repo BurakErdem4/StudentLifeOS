@@ -48,10 +48,10 @@
                         ];
 
                         const allProjects = [
-                            ...tytKonu.map(p => ({ ...p, phase: 'TYT' })),
-                            ...tytSoru.map(p => ({ ...p, phase: 'TYT' })),
-                            ...aytKonu.map(p => ({ ...p, phase: 'AYT' })),
-                            ...aytSoru.map(p => ({ ...p, phase: 'AYT' }))
+                            ...tytKonu.map(p => ({ ...p, phase: 'TYT', category: 'TYT Konu' })),
+                            ...tytSoru.map(p => ({ ...p, phase: 'TYT', category: 'TYT Soru' })),
+                            ...aytKonu.map(p => ({ ...p, phase: 'AYT', category: 'AYT Konu' })),
+                            ...aytSoru.map(p => ({ ...p, phase: 'AYT', category: 'AYT Soru' }))
                         ];
 
                         try {
@@ -85,6 +85,7 @@
                                     return {
                                         id: `proj_mock_${idx}`,
                                         title: tmp.title,
+                                        category: tmp.category,
                                         totalUnit: tmp.totalUnit,
                                         targetToReach: Math.round(tmp.totalUnit * personalRatio),
                                         currentUnit: 0,
