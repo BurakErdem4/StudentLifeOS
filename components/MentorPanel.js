@@ -4,207 +4,154 @@
         const DevTools = ({ openConfirm, onSeedMockData }) => {
             const [open, setOpen] = useState(false);
             const [loading, setLoading] = useState(false);
+
             const generateMockData = async () => {
                 if (!openConfirm) return alert('Hata: openConfirm prop eksik!');
                 openConfirm(
-                    '⚠️ DİKKAT: 20 YENİ ÖĞRENCİ OLUŞTURULACAK.',
-                    'Bu işlem veritabanına büyük miktarda veri yazacaktır. Devam et?',
+                    '⚠️ DİKKAT: 5 YENİ MÜKEMMEL ÖĞRENCİ OLUŞTURULACAK.',
+                    'Bu işlem 5 farklı başarı seviyesinden (Çok Başarılı - Başarısız) özenle hazırlanmış, geçmiş verileriyle birebir senkronize SAYISALCI öğrenciler üretecektir. Devam et?',
                     async () => {
                         setLoading(true);
 
-                        const classes = ["12-A", "12-B", "11-C", "11-D", "Mezun-1"];
-                        const names = ["Ayşe Yılmaz", "Can Demir", "Elif Kara", "Mehmet Çelik", "Zeynep Şahin", "Ali Koç", "Fatma Arslan", "Burak Yıldız", "Seda Polat", "Kerem Aydın", "Deniz Aksoy", "Cem Öztürk", "Ece Güneş", "Onur Kaya", "Selin Yücel", "Mert Doğan", "Buse Şen", "Tolga Kurt", "Gamze Yavuz", "Arda Taş"];
                         const projectTemplates = [
-                            { title: "TYT Genel Deneme (Puan)", total: 1000, unit: "Puan", est: 135 },
-                            { title: "AYT Sayısal Puan", total: 1000, unit: "Puan", est: 180 },
-                            { title: "Paragraf Soru Kampı", total: 1000, unit: "Soru", est: 1 },
-                            { title: "Matematik Soru Bankası", total: 1000, unit: "Soru", est: 2 },
-                            { title: "Fizik Denemeleri", total: 1000, unit: "Soru", est: 2 },
-                            { title: "Problemler Fasıklü", total: 1000, unit: "Soru", est: 2 },
-                            { title: "Kimya Branş Denemesi", total: 1000, unit: "Soru", est: 2 },
-                            { title: "Geometri Soru Bankası", total: 1000, unit: "Soru", est: 2 }
+                            { title: "TYT Konu", total: 400, unit: "Konu", est: 45 },
+                            { title: "TYT Soru", total: 15000, unit: "Soru", est: 2 },
+                            { title: "AYT Konu", total: 300, unit: "Konu", est: 60 },
+                            { title: "AYT Soru", total: 12000, unit: "Soru", est: 3 },
+                            { title: "Deneme Sınavları", total: 120, unit: "Deneme", est: 135 }
+                        ];
+
+                        const profiles = [
+                            { name: "Ali Yılmaz (Çok Başarılı)", group: "top", classId: "class_12a" },
+                            { name: "Zeynep Kaya (İyi Başarılı)", group: "high", classId: "class_12a" },
+                            { name: "Burak Demir (Orta)", group: "mid", classId: "class_12a" },
+                            { name: "Ayşe Çelik (Az Başarılı)", group: "low", classId: "class_12a" },
+                            { name: "Mehmet Şahin (Başarısız)", group: "poor", classId: "class_12a" }
                         ];
 
                         try {
-                            // 1. Create Classes
-                            const classUpdates = {};
-                            const classIds = [];
-                            for (let cName of classes) {
-                                const classId = "class_" + cName.replace('-', '');
-                                classUpdates[`users/school_metadata/classes/${classId}`] = { name: cName, studentCount: 0 };
-                                classIds.push({ id: classId, name: cName });
-                            }
+                            // 1. Create Class
+                            const classUpdates = {
+                                'users/school_metadata/classes/class_12a': { name: "12-A Sayısal", studentCount: 5 }
+                            };
                             await db.ref().update(classUpdates);
 
                             const batch = {};
 
                             // 2. Create Students
-                            for (let i = 0; i < 20; i++) {
+                            for (let i = 0; i < profiles.length; i++) {
                                 const uid = db.ref('users').push().key;
-                                const name = names[i];
-                                const assignedClass = classIds[i % classIds.length];
+                                const prof = profiles[i];
                                 
-                                // Group assignments:
-                                // 0-3: Top performers (Target: 800-950)
-                                // 4-7: Mid-high (Target: 600-750)
-                                // 8-11: Mid-low (Target: 400-550)
-                                // 12-15: Low (Target: 100-250)
-                                // 16-19: Chaotic/Random (Fluctuating, end up 300-600)
+                                const studentProjects = projectTemplates.map((tmp, idx) => ({
+                                    id: `proj_${Date.now()}_${idx}`,
+                                    title: tmp.title,
+                                    totalUnit: tmp.total,
+                                    currentUnit: 0,
+                                    unit: tmp.unit,
+                                    totalEstTime: tmp.total * tmp.est
+                                }));
+
+                                const finalRatios = {
+                                    "top": { min: 0.85, max: 0.98, prob: 0.90 },
+                                    "high": { min: 0.70, max: 0.85, prob: 0.75 },
+                                    "mid": { min: 0.45, max: 0.65, prob: 0.50 },
+                                    "low": { min: 0.25, max: 0.40, prob: 0.35 },
+                                    "poor": { min: 0.05, max: 0.15, prob: 0.15 }
+                                };
                                 
-                                let group = "top";
-                                if (i >= 4 && i <= 7) group = "mid-high";
-                                else if (i >= 8 && i <= 11) group = "mid-low";
-                                else if (i >= 12 && i <= 15) group = "low";
-                                else if (i >= 16) group = "chaotic";
+                                const ratio = finalRatios[prof.group];
+                                
+                                // Determine final target sum for each project
+                                const targetValues = studentProjects.map(p => {
+                                    const finalRatio = ratio.min + Math.random() * (ratio.max - ratio.min);
+                                    return Math.floor(p.totalUnit * finalRatio);
+                                });
 
-                                // Create Projects for Student
-                                const studentProjects = [];
-                                const numProjects = 8;
-                                const selectedTemplates = projectTemplates.slice(0, numProjects);
+                                // Distribute work over 180 days
+                                let studyDays = [];
+                                for (let d = 179; d >= 0; d--) {
+                                    let currentProb = ratio.prob;
+                                    // Add some realistic behavior
+                                    if (prof.group === "mid" && (d > 60 && d < 120)) currentProb = 0.25; // Slump in the middle
+                                    if (prof.group === "low" && d < 90) currentProb = 0.1; // Gives up halfway
+                                    
+                                    if (Math.random() < currentProb) {
+                                        studyDays.push(d);
+                                    }
+                                }
 
-                                // Base performance targets based on group
-                                let minTarget, maxTarget;
-                                if (group === "top") { minTarget = 800; maxTarget = 950; }
-                                else if (group === "mid-high") { minTarget = 600; maxTarget = 750; }
-                                else if (group === "mid-low") { minTarget = 400; maxTarget = 550; }
-                                else if (group === "low") { minTarget = 100; maxTarget = 250; }
-                                else { minTarget = 300; maxTarget = 600; } // chaotic
+                                // Chunk work per day
+                                const projectTasks = studentProjects.map(() => ({})); 
+                                studentProjects.forEach((p, pIdx) => {
+                                    let remaining = targetValues[pIdx];
+                                    let maxChunk = Math.max(1, Math.ceil(p.totalUnit * 0.025)); 
+                                    if (p.unit === "Deneme") maxChunk = 2; // Can't do 10 denemes a day
+                                    if (p.unit === "Konu") maxChunk = 5;
 
-                                selectedTemplates.forEach((tmp, idx) => {
-                                    // Slight variance per project
-                                    const t = minTarget + Math.random() * (maxTarget - minTarget);
-                                    studentProjects.push({
-                                        id: `proj_${Date.now()}_${idx}`,
-                                        title: tmp.title,
-                                        totalUnit: tmp.total,
-                                        currentUnit: 0,
-                                        unit: tmp.unit,
-                                        totalEstTime: tmp.total * tmp.est,
-                                        targetFinalValue: t
-                                    });
+                                    while (remaining > 0 && studyDays.length > 0) {
+                                        const d = studyDays[Math.floor(Math.random() * studyDays.length)];
+                                        let chunk = Math.min(remaining, Math.ceil(Math.random() * maxChunk));
+                                        
+                                        if (!projectTasks[pIdx][d]) projectTasks[pIdx][d] = 0;
+                                        projectTasks[pIdx][d] += chunk;
+                                        remaining -= chunk;
+                                    }
                                 });
 
                                 const history = {};
-                                
-                                // To create slumps/peaks, we divide the 180 days into 6 periods of 30 days
-                                const periodMultipliers = [];
-                                for (let p = 0; p < 6; p++) {
-                                    if (group === "top") periodMultipliers.push(0.8 + Math.random() * 0.4); // 0.8 - 1.2 (Consistent)
-                                    else if (group === "mid-high") periodMultipliers.push(0.6 + Math.random() * 0.6); // 0.6 - 1.2
-                                    else if (group === "mid-low") periodMultipliers.push(0.3 + Math.random() * 0.6); // 0.3 - 0.9
-                                    else if (group === "low") periodMultipliers.push(0.1 + Math.random() * 0.3); // 0.1 - 0.4
-                                    else periodMultipliers.push(Math.random() < 0.5 ? 0.1 : 1.5); // Chaotic! Either dead or working insanely hard
-                                }
-
-                                // 3. Generate History (180 Days Chronological)
                                 for (let d = 179; d >= 0; d--) {
                                     const date = new Date();
                                     date.setDate(date.getDate() - d);
                                     const k = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
                                     
-                                    const currentPeriod = Math.floor((179 - d) / 30);
-                                    const periodMult = periodMultipliers[Math.min(currentPeriod, 5)];
-                                    
-                                    // Does student study today?
-                                    // Top works 95% of days, low works 20%. Chaotic works based on period mult.
-                                    let dailyProb = 0.5;
-                                    if (group === "top") dailyProb = 0.95;
-                                    else if (group === "mid-high") dailyProb = 0.75;
-                                    else if (group === "mid-low") dailyProb = 0.5;
-                                    else if (group === "low") dailyProb = 0.2;
-                                    else dailyProb = periodMult > 0.8 ? 0.8 : 0.1;
-
-                                    const tasks = [];
-                                    if (Math.random() < dailyProb) {
-                                        const numTasks = 1 + Math.floor(Math.random() * 3);
-
-                                        for (let t = 0; t < numTasks; t++) {
-                                            const isProjectTask = Math.random() < 0.8;
-                                            
-                                            // Task completion probability
-                                            const isCompleted = Math.random() < (0.5 + (dailyProb * 0.4)); 
-
-                                            let task = {};
-                                            if (isProjectTask) {
-                                                const proj = studentProjects[Math.floor(Math.random() * studentProjects.length)];
-
-                                                // Calculate amount to add. 
-                                                // 180 days. To reach 800, need ~4.5 points per day if studying every day.
-                                                // So average amount should be around targetFinalValue / (180 * dailyProb * projProb)
-                                                // Let's just use a dynamic amount to ensure they reach near target
-                                                const remainingDays = d + 1;
-                                                const remainingTarget = proj.targetFinalValue - proj.currentUnit;
-                                                
-                                                let amount = 0;
-                                                if (remainingTarget > 0) {
-                                                    // Expected number of times this project will be picked again
-                                                    const expectedPicks = Math.max(1, remainingDays * dailyProb * 0.8 * 0.25);
-                                                    // Daily ideal step
-                                                    const idealStep = remainingTarget / expectedPicks;
-                                                    // Multiply by periodMult to get slumps/peaks
-                                                    // Multiply by random 0.5 to 1.5 to add noise
-                                                    amount = idealStep * periodMult * (0.5 + Math.random());
-                                                    
-                                                    // Round up, max 50 per day per project to avoid crazy spikes
-                                                    amount = Math.ceil(amount);
-                                                    if (amount > 50) amount = 50 + Math.floor(Math.random() * 20);
-                                                    if (amount < 1 && remainingTarget > 0) amount = 1;
-                                                }
-
-                                                if (isCompleted && proj.currentUnit < proj.targetFinalValue) {
-                                                    proj.currentUnit = Math.min(proj.totalUnit, proj.currentUnit + amount);
-                                                    task = {
-                                                        id: Date.now() + d * 1000 + t,
-                                                        title: `${proj.title} Gelişimi`,
-                                                        type: 'project_slice',
-                                                        pid: proj.id,
-                                                        targetAmount: amount,
-                                                        duration: 40 + Math.floor(Math.random() * 40),
-                                                        completed: true,
-                                                        subItems: [true]
-                                                    };
-                                                } else {
-                                                    task = {
-                                                        id: Date.now() + d * 1000 + t,
-                                                        title: "Tekrar & Etüt",
-                                                        duration: 45,
-                                                        completed: false,
-                                                        subItems: [false]
-                                                    };
-                                                }
-                                            } else {
-                                                task = {
-                                                    id: Date.now() + d * 1000 + t,
-                                                    title: ["Kitap Okuma", "Yürüyüş", "Kütüphane", "Paragraf", "Rehberlik"][Math.floor(Math.random() * 5)],
-                                                    duration: 30,
-                                                    completed: isCompleted,
-                                                    subItems: [isCompleted]
-                                                };
-                                            }
-                                            if (task.id) tasks.push(task);
+                                    const tasksForDay = [];
+                                    let taskCounter = 0;
+                                    studentProjects.forEach((p, pIdx) => {
+                                        if (projectTasks[pIdx][d] > 0) {
+                                            const amount = projectTasks[pIdx][d];
+                                            tasksForDay.push({
+                                                id: Date.now() + d * 1000 + (taskCounter++),
+                                                title: `${p.title} Çalışması`,
+                                                type: 'project_slice',
+                                                pid: p.id,
+                                                targetAmount: amount,
+                                                duration: p.unit === "Soru" ? Math.max(30, amount * 2) : p.unit === "Deneme" ? amount * 150 : amount * 45,
+                                                completed: true,
+                                                subItems: [true]
+                                            });
                                         }
+                                    });
+                                    
+                                    if (tasksForDay.length > 0) {
+                                        history[k] = { tasks: tasksForDay };
                                     }
-                                    if (tasks.length > 0) history[k] = { tasks };
                                 }
 
-                                // Clean up
-                                studentProjects.forEach(p => delete p.targetFinalValue);
+                                // Sync exact completed amounts
+                                studentProjects.forEach((p, pIdx) => {
+                                    let totalDone = 0;
+                                    if (projectTasks[pIdx]) {
+                                        Object.values(projectTasks[pIdx]).forEach(amt => totalDone += amt);
+                                    }
+                                    p.currentUnit = totalDone;
+                                });
 
                                 batch[`users/${uid}`] = {
                                     profile: {
-                                        name,
-                                        email: `mock${i}@student.com`,
+                                        name: prof.name,
+                                        email: `mock_${prof.group}@student.com`,
                                         role: 'student',
                                         isMock: true,
-                                        classId: assignedClass.id,
-                                        className: assignedClass.name
+                                        classId: prof.classId,
+                                        className: "12-A Sayısal"
                                     },
                                     projects: studentProjects,
                                     history
                                 };
                             }
                             await db.ref().update(batch);
-                            alert("✅ YKS SİMÜLASYONU Tamamlandı!\\nFarklı profillerdeki (11-C, 12-A, Mezun) öğrencilerin 180 günlük borsa benzeri gerçekçi grafikleri yüklendi.");
+                            alert("✅ Mükemmel YKS Simülasyonu Tamamlandı!\nTam 5 adet özenle hazırlanmış sayısal öğrenci eklendi. Tüm geçmiş veriler hedeflerle %100 uyumludur.");
                         } catch (e) {
                             alert("Hata: " + e.message);
                             console.error(e);
@@ -214,7 +161,6 @@
                     }
                 );
             };
-
 
             const deleteMockData = async () => {
                 if (!openConfirm) return;
@@ -230,14 +176,10 @@
                                 updates[`users/${child.key}`] = null;
                             });
 
-                            // Also remove users with classId === 'mock_class' (Legacy Fix)
                             const snap2 = await db.ref('users').orderByChild('profile/classId').equalTo('mock_class').once('value');
                             snap2.forEach(child => {
                                 updates[`users/${child.key}`] = null;
                             });
-
-                            // Also clear classes?? No, keep school metadata safe or clear? Let's just reset users.
-                            // Ideally we should decrement class counts but this is DEV toggle.
 
                             if (Object.keys(updates).length > 0) {
                                 await db.ref().update(updates);
