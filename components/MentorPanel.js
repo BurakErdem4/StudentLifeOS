@@ -126,7 +126,7 @@
                                             targetAmount: amount,
                                             duration: p.unit === "Kısım" ? amount * 30 : amount * 5, // Estimate 30m per Kısım, 5m per Sayfa
                                             completed: true,
-                                            subItems: [true]
+                                            subItems: Array(amount).fill(true)
                                         });
                                     }
                                 });
