@@ -114,11 +114,11 @@ const ProjectAnalyticsChart = ({ student }) => {
                     .reduce((acc, t) => acc + calculateTaskGain(t), 0);
                 projectData[p.id].currentRawTotal += gainedToday;
                 if (metric === 'cumulative') {
-                    const pct = Math.min(100, (projectData[p.id].currentRawTotal / projectData[p.id].totalUnit) * 100);
+                    const pct = Math.max(0, Math.min(100, (projectData[p.id].currentRawTotal / projectData[p.id].totalUnit) * 100));
                     projectData[p.id].data.push(pct);
                     projectData[p.id].rawValues.push(projectData[p.id].currentRawTotal);
                 } else {
-                    const dailyPct = (gainedToday / projectData[p.id].totalUnit) * 100;
+                    const dailyPct = Math.max(0, (gainedToday / projectData[p.id].totalUnit) * 100);
                     projectData[p.id].data.push(dailyPct);
                     projectData[p.id].rawValues.push(gainedToday);
                 }
@@ -127,14 +127,14 @@ const ProjectAnalyticsChart = ({ student }) => {
 
         let filteredDatasets = Object.values(projectData);
         if (activeFilter !== 'ALL') {
-            if (activeFilter.startsWith('CAT_DETAILS_')) {
-                const cat = activeFilter.replace('CAT_DETAILS_', '');
+            if (String(activeFilter).startsWith('CAT_DETAILS_')) {
+                const cat = String(activeFilter).replace('CAT_DETAILS_', '');
                 filteredDatasets = filteredDatasets.filter(ds => {
                     const p = student.projects.find(proj => proj.id === ds.id);
                     return p && p.category === cat;
                 });
-            } else if (activeFilter.startsWith('CAT_')) {
-                const cat = activeFilter.replace('CAT_', '');
+            } else if (String(activeFilter).startsWith('CAT_')) {
+                const cat = String(activeFilter).replace('CAT_', '');
                 const projsInCat = student.projects.filter(p => p.category === cat);
                 const dsIds = projsInCat.map(p => p.id);
                 const relatedDs = filteredDatasets.filter(ds => dsIds.includes(ds.id));
