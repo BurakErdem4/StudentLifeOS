@@ -3161,7 +3161,7 @@ const StudentUI = ({
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-xl font-bold text-gray-900 dark:text-slate-100">Pomodoro Ayarla</h3>
                             <button onClick={() => setFocusSetupModal({ open: false, task: null, defaultMins: 0, maxMins: 0, inputMins: 0 })} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
-                                <Icons.X />
+                                <Icons.Close />
                             </button>
                         </div>
                         <p className="text-sm text-gray-600 dark:text-slate-400 mb-4 text-center">
