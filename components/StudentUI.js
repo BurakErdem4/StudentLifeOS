@@ -1388,6 +1388,24 @@ const StudentUI = ({
         </div>
     );
 
+    const [draggedDayTask, setDraggedDayTask] = React.useState(null);
+
+    const handleDayTaskDragEnter = (targetId) => {
+        if (!draggedDayTask || draggedDayTask === targetId) return;
+        const tasks = [...(currentDayData.tasks || [])];
+        const draggedIdx = tasks.findIndex(t => t.id === draggedDayTask);
+        const targetIdx = tasks.findIndex(t => t.id === targetId);
+        if (draggedIdx === -1 || targetIdx === -1) return;
+        const draggedItem = tasks[draggedIdx];
+        tasks.splice(draggedIdx, 1);
+        tasks.splice(targetIdx, 0, draggedItem);
+        updateCloud(`history/${dateKey}/tasks`, tasks);
+    };
+
+    const handleDayTaskDragEnd = () => {
+        setDraggedDayTask(null);
+    };
+
     const renderDateBar = () => (
         <div className="mx-5 my-2 bg-gray-50 dark:bg-slate-700 rounded-2xl p-2 flex items-center justify-between">
             <button onClick={() => {
@@ -1457,10 +1475,21 @@ const StudentUI = ({
 
             <div className="space-y-3">
                 {(currentDayData.tasks || []).map(t => (
-                    <div key={t.id} className={`bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border transition-all ${t.completed ? 'border-green-100 opacity-60' : 'border-gray-100 dark:border-slate-700'}`}>
-                        <div className="flex items-center gap-4">
+                    <div 
+                        key={t.id} 
+                        className={`bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border transition-all ${t.completed ? 'border-green-100 opacity-60' : 'border-gray-100 dark:border-slate-700'} ${draggedDayTask === t.id ? 'opacity-40 scale-[0.98]' : 'opacity-100'}`}
+                        draggable={true}
+                        onDragStart={(e) => { e.stopPropagation(); setDraggedDayTask(t.id); }}
+                        onDragEnter={() => handleDayTaskDragEnter(t.id)}
+                        onDragEnd={handleDayTaskDragEnd}
+                        onDragOver={(e) => e.preventDefault()}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="text-gray-300 dark:text-slate-600 hover:text-gray-500 cursor-grab active:cursor-grabbing pr-1 select-none flex-shrink-0" title="Sürükleyip sırala">
+                                <span className="text-[14px] leading-none tracking-[-2px]">⋮⋮</span>
+                            </div>
                             {t.type === 'project_slice' ? (
-                                <div className="flex flex-col gap-2 w-full">
+                                <div className="flex flex-col gap-2 flex-1 min-w-0">
                                     <div className="flex justify-between items-start">
                                         <div>
                                             {(() => {
