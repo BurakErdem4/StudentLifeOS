@@ -2436,26 +2436,26 @@ const StudentUI = ({
                         )}
 
                         {modal.type === 'project' && (
-                            <div className="space-y-4">
-                                <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">{modal.data ? 'Hedefi Düzenle' : 'Yeni Hedef'}</h2>
+                            <div className="space-y-2">
+                                <h2 className="text-lg font-bold text-gray-800 dark:text-slate-100">{modal.data ? 'Hedefi Düzenle' : 'Yeni Hedef'}</h2>
                                 {(() => {
                                     const existingCategories = [...new Set((projects || []).map(p => p?.category).filter(Boolean))];
                                     return (
                                         <>
-                                            <input placeholder="Kategori (Opsiyonel)" list="category-list" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none focus:bg-white focus:border focus:border-indigo-200 transition" value={form.category !== undefined ? form.category : (modal.data?.category ?? '')} onChange={e => setForm({ ...form, category: e.target.value })} />
+                                            <input placeholder="Kategori (Opsiyonel)" list="category-list" className="w-full p-3 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none focus:bg-white focus:border focus:border-indigo-200 transition" value={form.category !== undefined ? form.category : (modal.data?.category ?? '')} onChange={e => setForm({ ...form, category: e.target.value })} />
                                             <datalist id="category-list">
                                                 {existingCategories.map(cat => <option key={cat} value={cat} />)}
                                             </datalist>
                                         </>
                                     );
                                 })()}
-                                <input placeholder="Hedef Adı (örn: Matematik)" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.title !== undefined ? form.title : (modal.data?.title ?? '')} onChange={e => setForm({ ...form, title: e.target.value })} />
+                                <input placeholder="Hedef Adı (örn: Matematik)" className="w-full p-3 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.title !== undefined ? form.title : (modal.data?.title ?? '')} onChange={e => setForm({ ...form, title: e.target.value })} />
                                 
-                                <input type="number" placeholder="Ana Toplam Hedef (Örn: 400)" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.total !== undefined ? form.total : (modal.data?.totalUnit ?? '')} onChange={e => setForm({ ...form, total: e.target.value })} />
-                                <input placeholder="Ana Birim (Örn: Sayfa)" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.unit !== undefined ? form.unit : (modal.data?.unit ?? '')} onChange={e => setForm({ ...form, unit: e.target.value })} />
-                                <input type="number" placeholder="Kaç Birimde 1 Tik (Örn: 5)" title="Örneğin 20 sayfalık bir görevde, bu alana 5 yazarsanız ekranda sadece 4 adet tıklanabilir kutucuk oluşur." className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.stepSize !== undefined ? form.stepSize : (modal.data?.stepSize ?? '')} onChange={e => setForm({ ...form, stepSize: e.target.value })} />
+                                <input type="number" placeholder="Ana Toplam Hedef (Örn: 400)" className="w-full p-3 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.total !== undefined ? form.total : (modal.data?.totalUnit ?? '')} onChange={e => setForm({ ...form, total: e.target.value })} />
+                                <input placeholder="Ana Birim (Örn: Sayfa)" className="w-full p-3 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.unit !== undefined ? form.unit : (modal.data?.unit ?? '')} onChange={e => setForm({ ...form, unit: e.target.value })} />
+                                <input type="number" placeholder="Kaç Birimde 1 Tik (Örn: 5)" title="Örneğin 20 sayfalık bir görevde, bu alana 5 yazarsanız ekranda sadece 4 adet tıklanabilir kutucuk oluşur." className="w-full p-3 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.stepSize !== undefined ? form.stepSize : (modal.data?.stepSize ?? '')} onChange={e => setForm({ ...form, stepSize: e.target.value })} />
 
-                                <div className="bg-gray-50 dark:bg-slate-700/50 p-4 rounded-xl space-y-3 border border-gray-100 dark:border-slate-600">
+                                <div className="bg-gray-50 dark:bg-slate-700/50 p-3 rounded-xl space-y-2 border border-gray-100 dark:border-slate-600">
                                     <div className="flex justify-between items-center">
                                         <h3 className="font-bold text-sm text-gray-600 dark:text-slate-300">Konu / Kaynak Ağacı</h3>
                                     </div>
@@ -2516,10 +2516,10 @@ const StudentUI = ({
                                 <datalist id="topics-list">{(globalTags?.topics || []).map(t => <option key={t} value={t} />)}</datalist>
                                 <datalist id="sources-list">{(globalTags?.sources || []).map(s => <option key={s} value={s} />)}</datalist>
                                 <datalist id="types-list">{(globalTags?.types || []).map(t => <option key={t} value={t} />)}</datalist>
-                                <input type="number" placeholder="Şu anki Durum" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.current !== undefined ? form.current : (modal.data?.currentUnit ?? '')} onChange={e => setForm({ ...form, current: e.target.value })} />
-                                <input type="number" placeholder="Tahmini Toplam Saat" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.estTime !== undefined ? form.estTime : (modal.data?.totalEstTime ?? '')} onChange={e => setForm({ ...form, estTime: e.target.value })} />
+                                <input type="number" placeholder="Şu anki Durum" className="w-full p-3 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.current !== undefined ? form.current : (modal.data?.currentUnit ?? '')} onChange={e => setForm({ ...form, current: e.target.value })} />
+                                <input type="number" placeholder="Tahmini Toplam Saat" className="w-full p-3 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.estTime !== undefined ? form.estTime : (modal.data?.totalEstTime ?? '')} onChange={e => setForm({ ...form, estTime: e.target.value })} />
 
-                                <button onClick={modal.data ? handleEditProject : handleAddProject} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition">{modal.data ? 'Kaydet' : 'Oluştur'}</button>
+                                <button onClick={modal.data ? handleEditProject : handleAddProject} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">{modal.data ? 'Kaydet' : 'Oluştur'}</button>
                             </div>
                         )}
 
