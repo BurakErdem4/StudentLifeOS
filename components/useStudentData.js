@@ -151,15 +151,29 @@ function useStudentData(user, profile, showToast) {
             return !(hasTask && hasHabit);
         };
         let freezesLeft = streakFreeze;
-        for (let i = 1; i <= 3 && freezesLeft > 0; i++) {
+        for (let i = 3; i >= 1 && freezesLeft > 0; i--) {
             const d = new Date();
             d.setDate(d.getDate() - i);
             const key = gdk(d);
             const dayData = history[key];
+            
             if (isDayFailed(dayData)) {
-                updateCloud(`history/${key}/frozen`, true);
-                freezesLeft--;
-                updateCloud('streakFreeze', freezesLeft);
+                // Check if previous day was qualified (has a streak to protect)
+                const prevD = new Date(d);
+                prevD.setDate(prevD.getDate() - 1);
+                const prevKey = gdk(prevD);
+                const prevDayData = history[prevKey];
+                const isPrevQualified = !isDayFailed(prevDayData);
+                
+                if (isPrevQualified) {
+                    updateCloud(`history/${key}/frozen`, true);
+                    freezesLeft--;
+                    updateCloud('streakFreeze', freezesLeft);
+                    
+                    // Mutate locally so the next iteration sees it as qualified
+                    if (!history[key]) history[key] = {};
+                    history[key].frozen = true;
+                }
             }
         }
     }, [user, history, streakFreeze]);
