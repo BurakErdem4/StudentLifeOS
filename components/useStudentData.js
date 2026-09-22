@@ -487,7 +487,7 @@ function useStudentData(user, profile, showToast) {
     // --- PROJECT ACTIONS ---
     const handleAddProject = () => {
         if (form.title) {
-            const initial = Number(form.initial) || 0;
+            const initial = Number(form.current) || 0;
             const items = form.projectItems || [];
             const mainUnit = form.unit || items[0]?.unit || 'br';
 

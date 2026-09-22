@@ -1926,15 +1926,15 @@ const StudentUI = ({
                                                         <span className="text-2xl">{depth === 0 ? '📂' : depth === 1 ? '📁' : '📄'}</span>
                                                         <h3 className={`${depth === 0 ? 'text-lg' : 'text-md'} font-bold text-gray-800 dark:text-slate-100`}>{catName}</h3>
                                                         <span className="bg-indigo-100 text-indigo-600 text-xs font-bold px-2 py-1 rounded-lg">{allProjectsInThisBranch.length}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
                                                         <button
                                                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); openModal('edit_category', { fullPath, catName }); }}
-                                                            className="text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition ml-1 p-1 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
+                                                            className="text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition p-1 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
                                                             title="Kategoriyi Düzenle"
                                                         >
                                                             <Icons.Edit />
                                                         </button>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
                                                         <span className={`text-xs font-black px-2.5 py-1 rounded-lg transition-all ${isComplete ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-200' : 'bg-indigo-500/15 text-indigo-500 dark:text-indigo-300'}`}>
                                                             %{categoryProgressPercent}
                                                         </span>
