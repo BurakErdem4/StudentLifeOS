@@ -642,7 +642,6 @@ function useStudentData(user, profile, showToast) {
         addHabit, deleteHabit,
         handleAddProject, handleEditProject, handleDeleteProject,
         handleRenameCategory, handleDeleteCategory,
-        handleUpdateProfile,
         handleBuyReward, handleAddReward, handleDeleteReward,
         handleStartFocus, handleStopFocus
     };

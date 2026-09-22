@@ -209,7 +209,7 @@ const ProjectAnalyticsChart = ({ student }) => {
                 responsive: true, maintainAspectRatio: false,
                 interaction: { mode: 'nearest', intersect: true },
                 scales: {
-                    y: { beginAtZero: metric === 'velocity', min: yMin, max: yMax, suggestedMax: metric === 'velocity' ? 12 : undefined, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' }, border: { display: false } },
+                    y: { beginAtZero: metric === 'velocity', min: yMin, max: yMax, suggestedMax: metric === 'velocity' ? 12 : undefined, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', callback: function(val) { return Number(val).toFixed(1).replace('.0', ''); } }, border: { display: false } },
                     x: { grid: { display: false }, ticks: { color: '#9ca3af' }, border: { display: false } }
                 },
                 plugins: {
