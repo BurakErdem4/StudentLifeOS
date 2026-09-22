@@ -1417,6 +1417,7 @@ const StudentUI = ({
 
             <button onClick={() => setCalendarMode(calendarMode === 'day' ? 'month' : 'day')} className="flex items-center gap-2 px-4 py-2 hover:bg-white rounded-xl transition">
                 <span className="font-bold text-gray-800 dark:text-slate-100 text-sm">{getDayName(selectedDate)}</span>
+                {currentDayData?.frozen === true && <span title="Bu gün seri dondurucu ile korundu" className="text-lg">🧊</span>}
                 {selectedDate === todayKey && <div className="w-2 h-2 rounded-full bg-indigo-500"></div>}
             </button>
 
