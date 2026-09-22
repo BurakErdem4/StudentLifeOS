@@ -1717,16 +1717,36 @@ const StudentUI = ({
                                 (Number(b.lastActivityAt) || Number(b.id) || 0) - (Number(a.lastActivityAt) || Number(a.id) || 0)
                             );
 
-                            const grouped = sortedProjects.reduce((acc, p) => {
-                                const cat = p.category || 'Kategorisiz';
-                                if (!acc[cat]) acc[cat] = [];
-                                acc[cat].push(p);
-                                return acc;
-                            }, {});
+                            const tree = {};
+                            const uncategorized = [];
 
-                            const allCats = Object.keys(grouped).filter(c => c !== 'Kategorisiz');
+                            sortedProjects.forEach(p => {
+                                const cat = p.category || '';
+                                if (!cat || cat === 'Kategorisiz') {
+                                    uncategorized.push(p);
+                                    return;
+                                }
+                                const parts = cat.split('/').map(s => s.trim()).filter(Boolean);
+                                if (parts.length === 0) {
+                                    uncategorized.push(p);
+                                    return;
+                                }
+                                
+                                let current = tree;
+                                parts.forEach((part, idx) => {
+                                    if (!current[part]) {
+                                        current[part] = { projects: [], subCategories: {} };
+                                    }
+                                    if (idx === parts.length - 1) {
+                                        current[part].projects.push(p);
+                                    }
+                                    current = current[part].subCategories;
+                                });
+                            });
 
-                            // Sort categories: known order first, new categories appended at end
+                            const allCats = Object.keys(tree);
+
+                            // Sort root categories: known order first, new categories appended at end
                             const categories = [...allCats].sort((a, b) => {
                                 const ai = categoryOrder.indexOf(a);
                                 const bi = categoryOrder.indexOf(b);
@@ -1735,8 +1755,6 @@ const StudentUI = ({
                                 if (bi === -1) return -1;
                                 return ai - bi;
                             });
-
-                            const uncategorized = grouped['Kategorisiz'] || [];
 
                             const handleDragStart = (cat) => { dragItem.current = cat; setDraggingCat(cat); };
                             const handleDragEnter = (cat) => { dragOverItem.current = cat; };
@@ -1861,56 +1879,75 @@ const StudentUI = ({
 
                             return (
                                 <>
-                                    {categories.map(cat => {
-                                        const categoryProjects = grouped[cat];
-                                        const totalCategoryTime = categoryProjects.reduce((acc, p) => acc + (Number(p.totalEstTime) || 0), 0);
-                                        const completedCategoryTime = categoryProjects.reduce((acc, p) => {
+                                    const renderCategoryLevel = (catName, catData, fullPath, depth) => {
+                                        const allProjectsInThisBranch = [];
+                                        const collectProjects = (node) => {
+                                            allProjectsInThisBranch.push(...node.projects);
+                                            Object.values(node.subCategories).forEach(collectProjects);
+                                        };
+                                        collectProjects(catData);
+                                        
+                                        const totalCategoryTime = allProjectsInThisBranch.reduce((acc, p) => acc + (Number(p.totalEstTime) || 0), 0);
+                                        const completedCategoryTime = allProjectsInThisBranch.reduce((acc, p) => {
                                             const tu = Number(p.totalUnit) || 0;
                                             const cu = Number(p.currentUnit) || 0;
                                             const et = Number(p.totalEstTime) || 0;
                                             if (tu === 0) return acc;
                                             return acc + (cu / tu) * et;
                                         }, 0);
+                                        
                                         const categoryProgressPercent = totalCategoryTime > 0
                                             ? Math.min(100, Math.round((completedCategoryTime / totalCategoryTime) * 100))
                                             : 0;
-                                        const isComplete = categoryProgressPercent >= 100;
+                                        const isComplete = categoryProgressPercent >= 100 && totalCategoryTime > 0;
+                                        
+                                        const subCategoryNames = Object.keys(catData.subCategories).sort((a,b) => a.localeCompare(b));
+                                        
+                                        const groupClass = depth === 0 ? 'group/main' : depth === 1 ? 'group/sub' : 'group/subsub';
+                                        const rotateClass = depth === 0 ? 'group-open/main:rotate-90' : depth === 1 ? 'group-open/sub:rotate-90' : 'group-open/subsub:rotate-90';
 
                                         return (
-                                        <details
-                                            key={cat}
-                                            className={`group mb-6 bg-white dark:bg-slate-800 rounded-3xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden list-none transition-all duration-200 ${draggingCat === cat ? 'opacity-40 scale-[0.98]' : 'opacity-100'}`}
-                                            onDragEnter={() => handleDragEnter(cat)}
-                                            onDragEnd={handleDragEnd}
-                                            onDragOver={(e) => e.preventDefault()}
-                                        >
-                                            <summary className="flex items-center justify-between p-5 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/50 transition list-none [&::-webkit-details-marker]:hidden">
-                                                <div className="flex items-center gap-3">
-                                                    <span
-                                                        className="text-gray-400 dark:text-slate-500 text-lg leading-none cursor-grab active:cursor-grabbing select-none px-1 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
-                                                        title="Sürükleyerek sırala"
-                                                        draggable={true}
-                                                        onDragStart={(e) => { e.stopPropagation(); handleDragStart(cat); }}
-                                                    >⠿</span>
-                                                    <span className="text-2xl">📂</span>
-                                                    <h3 className="text-lg font-bold text-gray-800 dark:text-slate-100">{cat}</h3>
-                                                    <span className="bg-indigo-100 text-indigo-600 text-xs font-bold px-2 py-1 rounded-lg">{grouped[cat].length}</span>
+                                            <details
+                                                key={fullPath}
+                                                className={`${groupClass} mb-4 bg-white dark:bg-slate-800 rounded-3xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden list-none transition-all duration-200 ${draggingCat === fullPath && depth === 0 ? 'opacity-40 scale-[0.98]' : 'opacity-100'}`}
+                                                onDragEnter={depth === 0 ? () => handleDragEnter(fullPath) : undefined}
+                                                onDragEnd={depth === 0 ? handleDragEnd : undefined}
+                                                onDragOver={depth === 0 ? (e) => e.preventDefault() : undefined}
+                                            >
+                                                <summary className={`flex items-center justify-between p-5 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/50 transition list-none [&::-webkit-details-marker]:hidden ${depth > 0 ? 'bg-gray-50/50 dark:bg-slate-800/50' : ''}`}>
+                                                    <div className="flex items-center gap-3">
+                                                        {depth === 0 && (
+                                                            <span
+                                                                className="text-gray-400 dark:text-slate-500 text-lg leading-none cursor-grab active:cursor-grabbing select-none px-1 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
+                                                                title="Sürükleyerek sırala"
+                                                                draggable={true}
+                                                                onDragStart={(e) => { e.stopPropagation(); handleDragStart(fullPath); }}
+                                                            >⠿</span>
+                                                        )}
+                                                        <span className="text-2xl">{depth === 0 ? '📂' : depth === 1 ? '📁' : '📄'}</span>
+                                                        <h3 className={`${depth === 0 ? 'text-lg' : 'text-md'} font-bold text-gray-800 dark:text-slate-100`}>{catName}</h3>
+                                                        <span className="bg-indigo-100 text-indigo-600 text-xs font-bold px-2 py-1 rounded-lg">{allProjectsInThisBranch.length}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`text-xs font-black px-2.5 py-1 rounded-lg transition-all ${isComplete ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-200' : 'bg-indigo-500/15 text-indigo-500 dark:text-indigo-300'}`}>
+                                                            %{categoryProgressPercent}
+                                                        </span>
+                                                        <span className={`text-gray-400 dark:text-slate-400 ${rotateClass} transition-transform`}><Icons.ChevronRight /></span>
+                                                    </div>
+                                                </summary>
+                                                <div className="p-5 pt-0 border-t border-gray-100 dark:border-slate-700 mt-2">
+                                                    <div className="pt-4 space-y-4">
+                                                        {subCategoryNames.map(subCatName => renderCategoryLevel(subCatName, catData.subCategories[subCatName], fullPath + '/' + subCatName, depth + 1))}
+                                                        {catData.projects.map(renderProjectCard)}
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`text-xs font-black px-2.5 py-1 rounded-lg transition-all ${isComplete ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-200' : 'bg-indigo-500/15 text-indigo-500 dark:text-indigo-300'}`}>
-                                                        %{categoryProgressPercent}
-                                                    </span>
-                                                    <span className="text-gray-400 dark:text-slate-400 group-open:rotate-90 transition-transform"><Icons.ChevronRight /></span>
-                                                </div>
-                                            </summary>
-                                            <div className="p-5 pt-0 border-t border-gray-100 dark:border-slate-700 mt-2">
-                                                <div className="pt-4">
-                                                    {grouped[cat].map(renderProjectCard)}
-                                                </div>
-                                            </div>
-                                        </details>
+                                            </details>
                                         );
-                                    })}
+                                    };
+
+                                    return (
+                                        <>
+                                            {categories.map(cat => renderCategoryLevel(cat, tree[cat], cat, 0))}
 
                                     {uncategorized.length > 0 && (
                                         <div className="mt-2">
@@ -1989,7 +2026,19 @@ const StudentUI = ({
                                         <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto no-scrollbar">
                                             {(() => {
                                                 const catSet = new Set();
-                                                (studentData.projects || []).forEach(p => catSet.add(p.category || 'Serbest Hedefler'));
+                                                (studentData.projects || []).forEach(p => {
+                                                    const fullCat = p.category || 'Serbest Hedefler';
+                                                    if (fullCat === 'Serbest Hedefler') {
+                                                        catSet.add(fullCat);
+                                                    } else {
+                                                        const parts = fullCat.split('/').map(s => s.trim()).filter(Boolean);
+                                                        let current = '';
+                                                        parts.forEach(part => {
+                                                            current = current ? current + '/' + part : part;
+                                                            catSet.add(current);
+                                                        });
+                                                    }
+                                                });
                                                 const categoriesList = Array.from(catSet).map(c => ({ id: `c_${c}`, title: c, type: 'category' }));
                                                 const allProjectsList = (studentData.projects || []).map(p => ({ id: `p_${p.id}`, title: p.title, type: 'project' }));
                                                 const allOptions = [...categoriesList, ...allProjectsList];
@@ -2461,14 +2510,65 @@ const StudentUI = ({
                             <div className="space-y-2">
                                 <h2 className="text-lg font-bold text-gray-800 dark:text-slate-100">{modal.data ? 'Hedefi Düzenle' : 'Yeni Hedef'}</h2>
                                 {(() => {
-                                    const existingCategories = [...new Set((projects || []).map(p => p?.category).filter(Boolean))];
+                                    const currentCat = form.category !== undefined ? form.category : (modal.data?.category ?? '');
+                                    const parts = currentCat.split('/').map(p => p.trim());
+                                    const c1 = parts[0] || '';
+                                    const c2 = parts[1] || '';
+                                    const c3 = parts[2] || '';
+
+                                    const allCats = (projects || []).map(p => p?.category).filter(Boolean);
+                                    const roots = [...new Set(allCats.map(c => c.split('/')[0].trim()))].filter(Boolean);
+                                    
+                                    let subs = [];
+                                    if (c1) {
+                                        subs = [...new Set(allCats
+                                            .filter(c => c.split('/')[0].trim() === c1)
+                                            .map(c => c.split('/')[1]?.trim())
+                                            .filter(Boolean)
+                                        )];
+                                    }
+                                    
+                                    let subsubs = [];
+                                    if (c1 && c2) {
+                                        subsubs = [...new Set(allCats
+                                            .filter(c => c.split('/')[0].trim() === c1 && c.split('/')[1]?.trim() === c2)
+                                            .map(c => c.split('/')[2]?.trim())
+                                            .filter(Boolean)
+                                        )];
+                                    }
+
+                                    const updateCat = (level, val) => {
+                                        const newParts = [c1, c2, c3];
+                                        newParts[level] = val; // don't trim while typing
+                                        
+                                        if (level === 0 && val !== c1) { newParts[1] = ''; newParts[2] = ''; }
+                                        if (level === 1 && val !== c2) { newParts[2] = ''; }
+                                        
+                                        let finalString = newParts[0].trim();
+                                        if (newParts[1].trim()) finalString += '/' + newParts[1].trim();
+                                        if (newParts[1].trim() && newParts[2].trim()) finalString += '/' + newParts[2].trim();
+                                        setForm({ ...form, category: finalString });
+                                    };
+
                                     return (
-                                        <>
-                                            <input placeholder="Kategori (Opsiyonel)" list="category-list" className="w-full p-3 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none focus:bg-white focus:border focus:border-indigo-200 transition" value={form.category !== undefined ? form.category : (modal.data?.category ?? '')} onChange={e => setForm({ ...form, category: e.target.value })} />
-                                            <datalist id="category-list">
-                                                {existingCategories.map(cat => <option key={cat} value={cat} />)}
-                                            </datalist>
-                                        </>
+                                        <div className="flex flex-col sm:flex-row gap-2">
+                                            <div className="flex-1">
+                                                <input placeholder="Kategori (Opsiyonel)" list="cat-root" className="w-full p-3 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none focus:bg-white focus:border focus:border-indigo-200 transition text-sm" value={c1} onChange={e => updateCat(0, e.target.value)} />
+                                                <datalist id="cat-root">{roots.map(c => <option key={c} value={c} />)}</datalist>
+                                            </div>
+                                            {(c1 || c2) && (
+                                                <div className="flex-1">
+                                                    <input placeholder="Alt Kategori" list="cat-sub" className="w-full p-3 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none focus:bg-white focus:border focus:border-indigo-200 transition text-sm" value={c2} onChange={e => updateCat(1, e.target.value)} />
+                                                    <datalist id="cat-sub">{subs.map(c => <option key={c} value={c} />)}</datalist>
+                                                </div>
+                                            )}
+                                            {(c2 || c3) && (
+                                                <div className="flex-1">
+                                                    <input placeholder="2. Alt Kategori" list="cat-subsub" className="w-full p-3 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none focus:bg-white focus:border focus:border-indigo-200 transition text-sm" value={c3} onChange={e => updateCat(2, e.target.value)} />
+                                                    <datalist id="cat-subsub">{subsubs.map(c => <option key={c} value={c} />)}</datalist>
+                                                </div>
+                                            )}
+                                        </div>
                                     );
                                 })()}
                                 <input placeholder="Hedef Adı (örn: Matematik)" className="w-full p-3 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.title !== undefined ? form.title : (modal.data?.title ?? '')} onChange={e => setForm({ ...form, title: e.target.value })} />

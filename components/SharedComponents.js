@@ -315,32 +315,34 @@ const StudentRadarChart = ({ student, selectedItems }) => {
         const rawTarget = [];
         const dataPerformance = [];
 
-        // Pre-calculate category aggregates just in case
-        const categories = {};
-        student.projects.forEach(p => {
-            const cat = p.category || 'Serbest Hedefler';
-            if (!categories[cat]) categories[cat] = { totalEstTime: 0, completedEstTime: 0 };
-
-            const pTotalUnit = Number(p.totalUnit) || 1;
-            const pCurrentUnit = Number(p.currentUnit) || 0;
-            const pTotalEstTime = Number(p.totalEstTime) || 0;
-            const pCompletedEstTime = (pCurrentUnit / pTotalUnit) * pTotalEstTime;
-
-            categories[cat].totalEstTime += pTotalEstTime;
-            categories[cat].completedEstTime += pCompletedEstTime;
-        });
-
-        // Collect data in order of selection or just by selection existence
+        // Collected data
         selectedItems.forEach(itemId => {
             if (itemId.startsWith('c_')) {
                 const catName = itemId.substring(2);
-                if (categories[catName]) {
+                let totalTime = 0;
+                let completedTime = 0;
+                let count = 0;
+                
+                student.projects.forEach(p => {
+                    const pCat = p.category || 'Serbest Hedefler';
+                    // Match exact, or child paths (e.g. "Spor" matches "Spor" and "Spor/Kardiyo")
+                    if (pCat === catName || pCat.startsWith(catName + '/')) {
+                        const pTotalUnit = Number(p.totalUnit) || 1;
+                        const pCurrentUnit = Number(p.currentUnit) || 0;
+                        const pTotalEstTime = Number(p.totalEstTime) || 0;
+                        const pCompletedEstTime = (pCurrentUnit / pTotalUnit) * pTotalEstTime;
+
+                        totalTime += pTotalEstTime;
+                        completedTime += pCompletedEstTime;
+                        count++;
+                    }
+                });
+                
+                if (count > 0) {
                     labels.push(catName);
-                    const totalTime = categories[catName].totalEstTime;
-                    const completedTime = categories[catName].completedEstTime;
-                    rawTarget.push(totalTime);
-                    const percent = totalTime === 0 ? 0 : Math.min(100, Math.round((completedTime / totalTime) * 100));
-                    dataPerformance.push(percent);
+                    const perf = totalTime > 0 ? (completedTime / totalTime) * 100 : 0;
+                    rawTarget.push(totalTime / 60); // raw target in hours
+                    dataPerformance.push(Math.round(perf));
                 }
             } else if (itemId.startsWith('p_')) {
                 const pId = itemId.substring(2);
