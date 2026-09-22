@@ -578,6 +578,46 @@ function useStudentData(user, profile, showToast) {
         setFocusMode({ ...focusMode, active: false });
     };
 
+    // --- CATEGORY ACTIONS ---
+    const handleRenameCategory = (oldPath, newPath) => {
+        if (!oldPath || !newPath) return;
+        const updatedProjects = projects.map(p => {
+            const pCat = p.category || '';
+            if (pCat === oldPath) {
+                return { ...p, category: newPath };
+            } else if (pCat.startsWith(oldPath + '/')) {
+                const remainder = pCat.substring(oldPath.length);
+                return { ...p, category: newPath + remainder };
+            }
+            return p;
+        });
+        updateCloud('projects', updatedProjects);
+        if (typeof showToast === 'function') showToast('Kategori başarıyla yenilendi! ✏️', 'success');
+        closeModal();
+    };
+
+    const handleDeleteCategory = (path, deleteProjects = false) => {
+        if (!path) return;
+        let updatedProjects;
+        if (deleteProjects) {
+            updatedProjects = projects.filter(p => {
+                const pCat = p.category || '';
+                return pCat !== path && !pCat.startsWith(path + '/');
+            });
+        } else {
+            updatedProjects = projects.map(p => {
+                const pCat = p.category || '';
+                if (pCat === path || pCat.startsWith(path + '/')) {
+                    return { ...p, category: 'Kategorisiz' };
+                }
+                return p;
+            });
+        }
+        updateCloud('projects', updatedProjects);
+        if (typeof showToast === 'function') showToast('Kategori silindi! 🗑️', 'success');
+        closeModal();
+    };
+
     // --- RETURN ---
     return {
         // State
@@ -601,7 +641,9 @@ function useStudentData(user, profile, showToast) {
         toggleTask, toggleSubItem, toggleSubItemChunk, toggleHabit, deleteTask,
         addHabit, deleteHabit,
         handleAddProject, handleEditProject, handleDeleteProject,
+        handleRenameCategory, handleDeleteCategory,
+        handleUpdateProfile,
         handleBuyReward, handleAddReward, handleDeleteReward,
-        handleStartFocus, handleStopFocus,
+        handleStartFocus, handleStopFocus
     };
-}
+};

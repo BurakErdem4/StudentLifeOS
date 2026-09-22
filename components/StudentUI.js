@@ -1010,6 +1010,7 @@ const StudentUI = ({
     focusMode, setFocusMode, modal, openModal, closeModal, form, setForm,
     notificationModal, closeNotification,
     handleAddProject, handleEditProject, handleDeleteProject,
+    handleRenameCategory, handleDeleteCategory,
     handleAddTask, toggleTask, toggleSubItem, toggleSubItemChunk, deleteTask,
     addHabit, deleteHabit, toggleHabit,
     handlePurchase, handleStartFocus, handleStopFocus,
@@ -1925,6 +1926,13 @@ const StudentUI = ({
                                                         <span className="text-2xl">{depth === 0 ? '📂' : depth === 1 ? '📁' : '📄'}</span>
                                                         <h3 className={`${depth === 0 ? 'text-lg' : 'text-md'} font-bold text-gray-800 dark:text-slate-100`}>{catName}</h3>
                                                         <span className="bg-indigo-100 text-indigo-600 text-xs font-bold px-2 py-1 rounded-lg">{allProjectsInThisBranch.length}</span>
+                                                        <button
+                                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); openModal('edit_category', { fullPath, catName }); }}
+                                                            className="text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition ml-1 p-1 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
+                                                            title="Kategoriyi Düzenle"
+                                                        >
+                                                            <Icons.Edit />
+                                                        </button>
                                                     </div>
                                                     <div className="flex items-center gap-2">
                                                         <span className={`text-xs font-black px-2.5 py-1 rounded-lg transition-all ${isComplete ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-200' : 'bg-indigo-500/15 text-indigo-500 dark:text-indigo-300'}`}>
@@ -2504,6 +2512,55 @@ const StudentUI = ({
                             </div>
                         )}
 
+                        {modal.type === 'edit_category' && (() => {
+                            const { fullPath, catName } = modal.data || {};
+                            return (
+                                <div className="space-y-4">
+                                    <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Kategoriyi Düzenle</h2>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-gray-500 dark:text-slate-400">Kategori Adı</label>
+                                        <input
+                                            type="text"
+                                            className="w-full p-3 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-800 dark:text-slate-100 outline-none border border-transparent focus:border-indigo-300"
+                                            value={form.newCategoryName !== undefined ? form.newCategoryName : (catName || '')}
+                                            onChange={e => setForm({ ...form, newCategoryName: e.target.value })}
+                                            placeholder="Örn: YKS"
+                                        />
+                                    </div>
+                                    <div className="pt-2 flex flex-col gap-2">
+                                        <button
+                                            onClick={() => handleRenameCategory(fullPath, form.newCategoryName !== undefined ? form.newCategoryName : catName)}
+                                            className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition"
+                                        >
+                                            Yeniden Adlandır
+                                        </button>
+                                        <div className="h-px w-full bg-gray-100 dark:bg-slate-700 my-2"></div>
+                                        <label className="text-xs font-bold text-gray-500 dark:text-slate-400 mb-1">Silme Seçenekleri</label>
+                                        <button
+                                            onClick={() => {
+                                                if (confirm('Bu kategori altındaki TÜM HEDEFLER de silinecektir. Emin misin?')) {
+                                                    handleDeleteCategory(fullPath, true);
+                                                }
+                                            }}
+                                            className="w-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/30 py-3 rounded-xl font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition"
+                                        >
+                                            İçindeki Hedeflerle Birlikte Sil
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                if (confirm('Kategori silinecek, ancak içindeki hedefler silinmeyecek ve "Kategorisiz" olarak kalacaktır. Emin misin?')) {
+                                                    handleDeleteCategory(fullPath, false);
+                                                }
+                                            }}
+                                            className="w-full bg-gray-50 dark:bg-slate-700 text-gray-600 dark:text-slate-300 py-3 rounded-xl font-bold hover:bg-gray-100 dark:hover:bg-slate-600 transition"
+                                        >
+                                            Sadece Kategoriyi Sil
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
                         {modal.type === 'project' && (
                             <div className="space-y-2">
                                 <h2 className="text-lg font-bold text-gray-800 dark:text-slate-100">{modal.data ? 'Hedefi Düzenle' : 'Yeni Hedef'}</h2>
@@ -2639,7 +2696,16 @@ const StudentUI = ({
                                 <input type="number" placeholder="Şu anki Durum" className="w-full p-3 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.current !== undefined ? form.current : (modal.data?.currentUnit ?? '')} onChange={e => setForm({ ...form, current: e.target.value })} />
                                 <input type="number" placeholder="Tahmini Toplam Saat" className="w-full p-3 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.estTime !== undefined ? form.estTime : (modal.data?.totalEstTime ?? '')} onChange={e => setForm({ ...form, estTime: e.target.value })} />
 
-                                <button onClick={modal.data ? handleEditProject : handleAddProject} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">{modal.data ? 'Kaydet' : 'Oluştur'}</button>
+                                {modal.data ? (
+                                    <div className="flex gap-2">
+                                        <button onClick={() => { openModal('delete_project', modal.data); }} className="bg-red-50 dark:bg-red-900/20 text-red-500 border border-red-100 dark:border-red-900/30 p-3 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/40 transition flex items-center justify-center aspect-square" title="Hedefi Sil">
+                                            <Icons.Trash />
+                                        </button>
+                                        <button onClick={handleEditProject} className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">Kaydet</button>
+                                    </div>
+                                ) : (
+                                    <button onClick={handleAddProject} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">Oluştur</button>
+                                )}
                             </div>
                         )}
 
