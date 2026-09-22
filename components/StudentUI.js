@@ -2336,32 +2336,66 @@ const StudentUI = ({
                                             <h3 className="text-xs font-bold text-gray-400 dark:text-slate-400 uppercase tracking-wider mb-3">HEDEFLERDEN ÇEK</h3>
                                             <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
                                                 {(() => {
-                                                    const catMap = {};
+                                                    const tree = {};
+                                                    const uncategorized = [];
+                                                    
                                                     projects.forEach(p => {
                                                         const cat = p.category || 'Serbest Hedefler';
-                                                        if (!catMap[cat]) catMap[cat] = { name: cat, projects: [], lastAccessedAt: 0 };
-                                                        catMap[cat].projects.push(p);
-                                                        if (p.lastAccessedAt && p.lastAccessedAt > catMap[cat].lastAccessedAt) {
-                                                            catMap[cat].lastAccessedAt = p.lastAccessedAt;
+                                                        if (cat === 'Serbest Hedefler') {
+                                                            uncategorized.push(p);
+                                                            return;
                                                         }
+                                                        const parts = cat.split('/').map(s => s.trim()).filter(Boolean);
+                                                        if (parts.length === 0) {
+                                                            uncategorized.push(p);
+                                                            return;
+                                                        }
+                                                        
+                                                        let current = tree;
+                                                        parts.forEach((part, idx) => {
+                                                            if (!current[part]) {
+                                                                current[part] = { name: part, projects: [], subCategories: {}, lastAccessedAt: 0, totalProjects: 0 };
+                                                            }
+                                                            current[part].totalProjects++;
+                                                            if (p.lastAccessedAt && p.lastAccessedAt > current[part].lastAccessedAt) {
+                                                                current[part].lastAccessedAt = p.lastAccessedAt;
+                                                            }
+                                                            if (idx === parts.length - 1) {
+                                                                current[part].projects.push(p);
+                                                            }
+                                                            current = current[part].subCategories;
+                                                        });
                                                     });
                                                     
-                                                    const sortedCats = Object.values(catMap).sort((a, b) => b.lastAccessedAt - a.lastAccessedAt);
-                                                    if (sortedCats.length === 0) return <div className="text-gray-400 dark:text-slate-400 text-sm text-center py-4">Henüz hedef eklemedin.</div>;
+                                                    if (uncategorized.length > 0) {
+                                                        tree['Serbest Hedefler'] = {
+                                                            name: 'Serbest Hedefler',
+                                                            projects: uncategorized,
+                                                            subCategories: {},
+                                                            lastAccessedAt: Math.max(0, ...uncategorized.map(p => p.lastAccessedAt || 0)),
+                                                            totalProjects: uncategorized.length
+                                                        };
+                                                    }
                                                     
-                                                    return sortedCats.map((cat, idx) => {
-                                                        const sortedProjects = [...cat.projects].sort((a, b) => (b.lastAccessedAt || 0) - (a.lastAccessedAt || 0));
+                                                    const renderModalCategory = (node, depth, isFirstRoot) => {
+                                                        const subCatNames = Object.keys(node.subCategories).sort((a, b) => node.subCategories[b].lastAccessedAt - node.subCategories[a].lastAccessedAt);
+                                                        const sortedProjects = [...node.projects].sort((a, b) => (b.lastAccessedAt || 0) - (a.lastAccessedAt || 0));
+                                                        const isEmpty = subCatNames.length === 0 && sortedProjects.length === 0;
+                                                        
+                                                        if (isEmpty) return null;
+
                                                         return (
-                                                            <details key={cat.name} className="group/cat bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm" open={idx === 0}>
-                                                                <summary className="p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/50 flex items-center justify-between list-none [&::-webkit-details-marker]:hidden">
+                                                            <details key={node.name} className={`group/cat bg-white dark:bg-slate-800 rounded-2xl overflow-hidden ${depth === 0 ? 'border border-gray-100 dark:border-slate-700 shadow-sm' : 'border-l-2 border-indigo-100 dark:border-indigo-900/50 mt-2 ml-2'}`} open={depth === 0 ? isFirstRoot : false}>
+                                                                <summary className={`p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/50 flex items-center justify-between list-none [&::-webkit-details-marker]:hidden ${depth > 0 ? 'py-3' : ''}`}>
                                                                     <div className="flex items-center gap-3">
-                                                                        <span className="text-xl">📂</span>
-                                                                        <span className="font-bold text-gray-800 dark:text-slate-100">{cat.name.replace(/\//g, ' / ')}</span>
-                                                                        <span className="bg-indigo-100 text-indigo-600 text-[10px] font-bold px-2 py-0.5 rounded-lg">{cat.projects.length}</span>
+                                                                        <span className="text-xl">{depth === 0 ? '📂' : '📁'}</span>
+                                                                        <span className={`font-bold text-gray-800 dark:text-slate-100 ${depth > 0 ? 'text-sm' : ''}`}>{node.name}</span>
+                                                                        <span className="bg-indigo-100 text-indigo-600 text-[10px] font-bold px-2 py-0.5 rounded-lg">{node.totalProjects}</span>
                                                                     </div>
                                                                     <span className="text-gray-400 group-open/cat:rotate-90 transition-transform"><Icons.ChevronRight /></span>
                                                                 </summary>
-                                                                <div className="p-2 border-t border-gray-100 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 space-y-1">
+                                                                <div className={`p-2 border-t border-gray-100 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 space-y-1 ${depth > 0 ? 'bg-transparent dark:bg-transparent' : ''}`}>
+                                                                    {subCatNames.map(name => renderModalCategory(node.subCategories[name], depth + 1, false))}
                                                                     {sortedProjects.map(p => {
                                                                         const isCompleted = (Number(p.currentUnit) || 0) >= (Number(p.totalUnit) || 1);
                                                                         return (
@@ -2382,7 +2416,12 @@ const StudentUI = ({
                                                                 </div>
                                                             </details>
                                                         );
-                                                    });
+                                                    };
+                                                    
+                                                    const rootNames = Object.keys(tree).sort((a, b) => tree[b].lastAccessedAt - tree[a].lastAccessedAt);
+                                                    if (rootNames.length === 0) return <div className="text-gray-400 dark:text-slate-400 text-sm text-center py-4">Henüz hedef eklemedin.</div>;
+                                                    
+                                                    return rootNames.map((name, idx) => renderModalCategory(tree[name], 0, idx === 0));
                                                 })()}
                                             </div>
                                         </div>
