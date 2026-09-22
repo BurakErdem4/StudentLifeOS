@@ -1026,6 +1026,7 @@ const StudentUI = ({
     const [showTimeline, setShowTimeline] = React.useState(false);
     const [categoryOrder, setCategoryOrder] = React.useState(profile?.settings?.categoryOrder || []);
     const [draggingCat, setDraggingCat] = React.useState(null);
+    const [focusSetupModal, setFocusSetupModal] = React.useState({ open: false, task: null, defaultMins: 0, maxMins: 0, inputMins: 0 });
     const dragItem = React.useRef(null);
     const dragOverItem = React.useRef(null);
 
@@ -1473,7 +1474,18 @@ const StudentUI = ({
                                         </div>
                                         <div className="flex items-center gap-1">
                                             {(t.subItems ? !t.subItems.every(Boolean) : !t.completed) && (
-                                                <button onClick={() => setFocusMode({ active: true, taskId: t.id, taskTitle: t.title, timeLeft: Math.round(Number(t.duration) / (t.subItems ? t.subItems.length : 1)) * 60, isRunning: true })} className="p-2 text-indigo-300 hover:text-indigo-600">
+                                                <button onClick={() => {
+                                                    const worked = Number(t.workedMinutes) || 0;
+                                                    const duration = Number(t.duration) || 0;
+                                                    const maxMins = Math.max(0, duration - worked);
+                                                    if (maxMins === 0) {
+                                                        if (window.showToast) window.showToast('Bu görev için belirlenen süre doldu.', 'info');
+                                                        else alert('Bu görev için belirlenen süre doldu.');
+                                                        return;
+                                                    }
+                                                    const defaultMins = Math.min(maxMins, Math.round(duration / (t.subItems ? Math.ceil(t.subItems.length / (Number(t.stepSize) || 1)) : 1)));
+                                                    setFocusSetupModal({ open: true, task: t, defaultMins, maxMins, inputMins: defaultMins });
+                                                }} className="p-2 text-indigo-300 hover:text-indigo-600">
                                                     <Icons.Play />
                                                 </button>
                                             )}
@@ -1520,7 +1532,17 @@ const StudentUI = ({
                                         <div className="text-xs text-gray-400 dark:text-slate-400 mt-0.5">{t.duration} dk</div>
                                     </div>
                                     {!t.completed && (
-                                        <button onClick={() => setFocusMode({ active: true, taskId: t.id, taskTitle: t.title, timeLeft: Number(t.duration) * 60, isRunning: true })} className="p-2 text-indigo-300 hover:text-indigo-600">
+                                        <button onClick={() => {
+                                            const worked = Number(t.workedMinutes) || 0;
+                                            const duration = Number(t.duration) || 0;
+                                            const maxMins = Math.max(0, duration - worked);
+                                            if (maxMins === 0) {
+                                                if (window.showToast) window.showToast('Bu görev için belirlenen süre doldu.', 'info');
+                                                else alert('Bu görev için belirlenen süre doldu.');
+                                                return;
+                                            }
+                                            setFocusSetupModal({ open: true, task: t, defaultMins: maxMins, maxMins, inputMins: maxMins });
+                                        }} className="p-2 text-indigo-300 hover:text-indigo-600">
                                             <Icons.Play />
                                         </button>
                                     )}
@@ -3132,6 +3154,45 @@ const StudentUI = ({
                     </div>
                 );
             })()}
+
+            {focusSetupModal.open && focusSetupModal.task && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-fade-in">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-w-sm w-full p-6 transform transition-all">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-slate-100">Pomodoro Ayarla</h3>
+                            <button onClick={() => setFocusSetupModal({ open: false, task: null, defaultMins: 0, maxMins: 0, inputMins: 0 })} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                                <Icons.X />
+                            </button>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-slate-400 mb-4 text-center">
+                            <strong>{focusSetupModal.task.title}</strong><br/>
+                            Kalan Maksimum Süre: <span className="font-bold text-indigo-500">{focusSetupModal.maxMins} dk</span>
+                        </p>
+                        <div className="flex flex-col gap-2 mb-6">
+                            <input type="number" 
+                                className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none text-center text-2xl" 
+                                value={focusSetupModal.inputMins === 0 ? '' : focusSetupModal.inputMins} 
+                                onChange={e => {
+                                    let val = parseInt(e.target.value);
+                                    if (isNaN(val)) val = 0;
+                                    if (val > focusSetupModal.maxMins) val = focusSetupModal.maxMins;
+                                    setFocusSetupModal(prev => ({ ...prev, inputMins: val }));
+                                }} 
+                                max={focusSetupModal.maxMins}
+                            />
+                        </div>
+                        <button onClick={() => {
+                            const mins = focusSetupModal.inputMins;
+                            if (mins > 0) {
+                                setFocusMode({ active: true, taskId: focusSetupModal.task.id, taskTitle: focusSetupModal.task.title, timeLeft: mins * 60, isRunning: true, initialTimeLeft: mins * 60 });
+                                setFocusSetupModal({ open: false, task: null, defaultMins: 0, maxMins: 0, inputMins: 0 });
+                            }
+                        }} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition">
+                            Başlat
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {focusMode.active && (
                 <div className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center text-white p-8 animate-fade-in">

@@ -20,7 +20,7 @@ function useStudentData(user, profile, showToast) {
     const [streakFreeze, setStreakFreeze] = useState(0);
     const [flippedCards, setFlippedCards] = useState({});
     const [flippedProjects, setFlippedProjects] = useState({});
-    const [focusMode, setFocusMode] = useState({ active: false, taskId: null, taskTitle: '', timeLeft: 0, isRunning: false });
+    const [focusMode, setFocusMode] = useState({ active: false, taskId: null, taskTitle: '', timeLeft: 0, isRunning: false, initialTimeLeft: 0 });
     const [modal, setModal] = useState({ open: false, type: null, data: null });
     const [form, setForm] = useState({});
     const [notificationModal, setNotificationModal] = useState(null);
@@ -557,8 +557,26 @@ function useStudentData(user, profile, showToast) {
     };
 
     // --- FOCUS MODE ---
-    const handleStartFocus = (t) => setFocusMode({ active: true, taskId: t.id, taskTitle: t.title, timeLeft: Number(t.duration) * 60, isRunning: true });
-    const handleStopFocus = () => setFocusMode({ ...focusMode, active: false });
+    const handleStartFocus = (t) => setFocusMode({ active: true, taskId: t.id, taskTitle: t.title, timeLeft: Number(t.duration) * 60, isRunning: true, initialTimeLeft: Number(t.duration) * 60 });
+    
+    const handleStopFocus = () => {
+        if (!focusMode.active) return;
+        
+        const elapsedSeconds = focusMode.initialTimeLeft - focusMode.timeLeft;
+        const elapsedMinutes = Math.round(elapsedSeconds / 60);
+
+        if (elapsedMinutes > 0 && currentDayData && currentDayData.tasks) {
+            const updatedTasks = currentDayData.tasks.map(t => {
+                if (t.id === focusMode.taskId) {
+                    return { ...t, workedMinutes: (t.workedMinutes || 0) + elapsedMinutes };
+                }
+                return t;
+            });
+            updateCloud(`history/${dateKey}/tasks`, updatedTasks);
+        }
+
+        setFocusMode({ ...focusMode, active: false });
+    };
 
     // --- RETURN ---
     return {
