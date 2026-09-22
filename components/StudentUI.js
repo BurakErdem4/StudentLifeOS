@@ -2335,24 +2335,55 @@ const StudentUI = ({
                                         <div className="mt-6">
                                             <h3 className="text-xs font-bold text-gray-400 dark:text-slate-400 uppercase tracking-wider mb-3">HEDEFLERDEN ÇEK</h3>
                                             <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
-                                                {projects.map(p => {
-                                                    const isCompleted = (Number(p.currentUnit) || 0) >= (Number(p.totalUnit) || 1);
-                                                    return (
-                                                        <button key={p.id} onClick={() => {
-                                                            if (isCompleted) {
-                                                                setForm({ ...form, projectId: 'completed_warning', pendingProjectId: p.id, pendingUnit: p.unit });
-                                                            } else {
-                                                                setForm({ ...form, type: 'import', projectId: p.id, unit: p.unit });
-                                                            }
-                                                        }} className={`w-full bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 p-4 rounded-2xl flex items-center justify-between hover:border-indigo-200 hover:bg-indigo-50 transition group ${isCompleted ? 'opacity-60 saturate-50' : ''}`}>
-                                                            <span className="font-bold text-gray-800 dark:text-slate-100 group-hover:text-indigo-700 flex items-center gap-2">
-                                                                {p.title} {isCompleted && <span title="Tamamlandı">✅</span>}
-                                                            </span>
-                                                            <span className="text-xs font-bold bg-gray-100 text-gray-500 dark:text-slate-400 px-2 py-1 rounded-lg group-hover:bg-white group-hover:text-indigo-500">{p.unit}</span>
-                                                        </button>
-                                                    );
-                                                })}
-                                                {projects.length === 0 && <div className="text-gray-400 dark:text-slate-400 text-sm text-center py-4">Henüz hedef eklemedin.</div>}
+                                                {(() => {
+                                                    const catMap = {};
+                                                    projects.forEach(p => {
+                                                        const cat = p.category || 'Serbest Hedefler';
+                                                        if (!catMap[cat]) catMap[cat] = { name: cat, projects: [], lastAccessedAt: 0 };
+                                                        catMap[cat].projects.push(p);
+                                                        if (p.lastAccessedAt && p.lastAccessedAt > catMap[cat].lastAccessedAt) {
+                                                            catMap[cat].lastAccessedAt = p.lastAccessedAt;
+                                                        }
+                                                    });
+                                                    
+                                                    const sortedCats = Object.values(catMap).sort((a, b) => b.lastAccessedAt - a.lastAccessedAt);
+                                                    if (sortedCats.length === 0) return <div className="text-gray-400 dark:text-slate-400 text-sm text-center py-4">Henüz hedef eklemedin.</div>;
+                                                    
+                                                    return sortedCats.map((cat, idx) => {
+                                                        const sortedProjects = [...cat.projects].sort((a, b) => (b.lastAccessedAt || 0) - (a.lastAccessedAt || 0));
+                                                        return (
+                                                            <details key={cat.name} className="group/cat bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm" open={idx === 0}>
+                                                                <summary className="p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/50 flex items-center justify-between list-none [&::-webkit-details-marker]:hidden">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <span className="text-xl">📂</span>
+                                                                        <span className="font-bold text-gray-800 dark:text-slate-100">{cat.name.replace(/\//g, ' / ')}</span>
+                                                                        <span className="bg-indigo-100 text-indigo-600 text-[10px] font-bold px-2 py-0.5 rounded-lg">{cat.projects.length}</span>
+                                                                    </div>
+                                                                    <span className="text-gray-400 group-open/cat:rotate-90 transition-transform"><Icons.ChevronRight /></span>
+                                                                </summary>
+                                                                <div className="p-2 border-t border-gray-100 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 space-y-1">
+                                                                    {sortedProjects.map(p => {
+                                                                        const isCompleted = (Number(p.currentUnit) || 0) >= (Number(p.totalUnit) || 1);
+                                                                        return (
+                                                                            <button key={p.id} onClick={() => {
+                                                                                if (isCompleted) {
+                                                                                    setForm({ ...form, projectId: 'completed_warning', pendingProjectId: p.id, pendingUnit: p.unit });
+                                                                                } else {
+                                                                                    setForm({ ...form, type: 'import', projectId: p.id, unit: p.unit });
+                                                                                }
+                                                                            }} className={`w-full bg-white dark:bg-slate-800 p-3 rounded-xl flex items-center justify-between hover:border-indigo-200 hover:bg-indigo-50 border border-transparent transition group ${isCompleted ? 'opacity-60 saturate-50' : ''}`}>
+                                                                                <span className="font-bold text-gray-700 dark:text-slate-200 group-hover:text-indigo-700 flex items-center gap-2 text-sm text-left line-clamp-1">
+                                                                                    {p.title} {isCompleted && <span title="Tamamlandı">✅</span>}
+                                                                                </span>
+                                                                                <span className="text-[10px] font-bold bg-gray-100 text-gray-500 dark:text-slate-400 px-2 py-1 rounded-lg group-hover:bg-white group-hover:text-indigo-500 shrink-0">{p.unit}</span>
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </details>
+                                                        );
+                                                    });
+                                                })()}
                                             </div>
                                         </div>
                                     </>

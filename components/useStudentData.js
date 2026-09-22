@@ -291,6 +291,9 @@ function useStudentData(user, profile, showToast) {
                 newTask.typeStr = selectedTopic.type || null;
                 newTask.projectItemId = selectedTopic.id || null;
             }
+            
+            const updatedProjects = projects.map(proj => String(proj.id) === String(p.id) ? { ...proj, lastAccessedAt: Date.now() } : proj);
+            updateCloud('projects', updatedProjects);
         }
         const tasksArr = Array.isArray(currentDayData.tasks) ? currentDayData.tasks : Object.values(currentDayData.tasks || {});
         const newTasks = [...tasksArr, newTask];
@@ -501,7 +504,8 @@ function useStudentData(user, profile, showToast) {
                 unit: mainUnit,
                 totalEstTime: Number(form.estTime) || 0,
                 stepSize: Number(form.stepSize) || 1,
-                projectItems: items
+                projectItems: items,
+                lastAccessedAt: Date.now()
             }]);
             processGlobalTags(items);
             if (typeof showToast === 'function') showToast('Proje başarıyla eklendi! 🚀', 'success');
