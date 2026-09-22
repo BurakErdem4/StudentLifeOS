@@ -1877,9 +1877,7 @@ const StudentUI = ({
                                 );
                             };
 
-                            return (
-                                <>
-                                    const renderCategoryLevel = (catName, catData, fullPath, depth) => {
+                            const renderCategoryLevel = (catName, catData, fullPath, depth) => {
                                         const allProjectsInThisBranch = [];
                                         const collectProjects = (node) => {
                                             allProjectsInThisBranch.push(...node.projects);
