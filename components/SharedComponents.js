@@ -229,7 +229,7 @@ const ProjectAnalyticsChart = ({ student }) => {
 
     return (
         <div className="bg-gray-900 p-5 rounded-3xl shadow-2xl border border-gray-800">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <div>
                     <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
@@ -240,11 +240,20 @@ const ProjectAnalyticsChart = ({ student }) => {
                         <button onClick={() => setMetric('velocity')} className={`text-xs font-bold px-4 py-1.5 rounded-xl transition ${metric === 'velocity' ? 'bg-indigo-500/20 text-indigo-400 ring-1 ring-indigo-500/50' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>Hız</button>
                     </div>
                 </div>
-                <div className="flex bg-gray-800 rounded-lg p-1 items-center">
+                <div className="flex bg-gray-800 rounded-lg p-1 items-center self-stretch sm:self-auto shrink-0 justify-between sm:justify-start">
                     <button onClick={() => setChartOffset(c => c - 1)} className="px-4 py-2 text-gray-400 hover:text-white transition">←</button>
-                    {['1w', '1m', '3m', '6m', '1y'].map(r => (
-                        <button key={r} onClick={() => setRange(r)} className={`px-8 py-2 text-xs font-bold rounded-md transition ${range === r ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}>{r.toUpperCase()}</button>
-                    ))}
+                    <select
+                        value={range}
+                        onChange={(e) => setRange(e.target.value)}
+                        className="bg-gray-700 text-white text-xs font-bold rounded-md py-2 px-3 mx-2 outline-none border-none cursor-pointer flex-1 sm:flex-none text-center appearance-none"
+                        style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
+                    >
+                        <option value="1w">1 HAFTA</option>
+                        <option value="1m">1 AY</option>
+                        <option value="3m">3 AY</option>
+                        <option value="6m">6 AY</option>
+                        <option value="1y">1 YIL</option>
+                    </select>
                     <button disabled={chartOffset === 0} onClick={() => setChartOffset(c => c + 1)} className={`px-4 py-2 transition ${chartOffset === 0 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white'}`}>→</button>
                 </div>
             </div>
