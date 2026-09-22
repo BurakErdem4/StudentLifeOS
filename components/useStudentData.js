@@ -281,7 +281,8 @@ function useStudentData(user, profile, showToast) {
             newTask = {
                 id: Date.now(), title: `${p.title}${itemTitleSuffix}`, type: 'project_slice',
                 pid: p.id, targetAmount: amount, subItems: new Array(amount).fill(false), completed: false,
-                duration: String(calculatedDuration), startTime: form.startTime || '', createdAt: Date.now()
+                duration: String(calculatedDuration), startTime: form.startTime || '', createdAt: Date.now(),
+                stepSize: p.stepSize || 1
             };
 
             if (selectedTopic) {
@@ -391,6 +392,71 @@ function useStudentData(user, profile, showToast) {
         }
     };
 
+    const toggleSubItemChunk = (taskId, chunkIdx) => {
+        try {
+            const rawTasks = Array.isArray(currentDayData.tasks)
+                ? currentDayData.tasks
+                : Object.values(currentDayData.tasks || {});
+            const tasksArr = rawTasks.filter(t => t !== null && t !== undefined);
+
+            const task = tasksArr.find(t => String(t.id) === String(taskId));
+            if (!task) return;
+
+            const stepSize = Number(task.stepSize) || 1;
+            const startIndex = chunkIdx * stepSize;
+            const endIndex = Math.min(startIndex + stepSize, task.subItems.length);
+            
+            const newSubItems = [...(task.subItems || [])];
+            
+            let isFullyDone = true;
+            for (let i = startIndex; i < endIndex; i++) {
+                if (!newSubItems[i]) {
+                    isFullyDone = false;
+                    break;
+                }
+            }
+            
+            for (let i = startIndex; i < endIndex; i++) {
+                newSubItems[i] = !isFullyDone;
+            }
+
+            const allDone = newSubItems.every(i => i === true);
+            const itemsChangedCount = isFullyDone ? -(endIndex - startIndex) : (endIndex - startIndex);
+            
+            updateGold(itemsChangedCount * 5); // 5 gold per sub item
+            
+            const updatedTasks = tasksArr.map(t => String(t.id) === String(taskId) ? { ...t, subItems: newSubItems, completed: allDone, lastActivityAt: Date.now() } : t);
+            updateCloud(`history/${dateKey}/tasks`, updatedTasks);
+
+            if (task.type === 'project_slice') {
+                const safeProjects = (projects || []).filter(p => p !== null && p !== undefined);
+                const targetProject = safeProjects.find(p => String(p.id) === String(task.pid));
+
+                if (targetProject) {
+                    const newCurrent = Math.max(0, (targetProject.currentUnit || 0) + itemsChangedCount);
+                    let items = targetProject.projectItems;
+                    if (task.projectItemId && targetProject.projectItems) {
+                        items = Array.isArray(targetProject.projectItems) ? [...targetProject.projectItems] : { ...targetProject.projectItems };
+                        const itemKey = Array.isArray(items)
+                            ? items.findIndex(i => i && String(i.id) === String(task.projectItemId))
+                            : Object.keys(items).find(k => items[k] && String(items[k].id) === String(task.projectItemId));
+
+                        if (itemKey !== -1 && itemKey !== undefined) {
+                            const currentCompleted = Number(items[itemKey].completedAmount) || 0;
+                            const newAmount = Math.max(0, currentCompleted + itemsChangedCount);
+                            items[itemKey] = { ...items[itemKey], completedAmount: newAmount };
+                        }
+                    }
+                    const updatedProjects = safeProjects.map(p => String(p.id) === String(task.pid) ? { ...p, currentUnit: newCurrent, projectItems: items, lastActivityAt: Date.now() } : p);
+                    updateCloud('projects', updatedProjects);
+                }
+            }
+        } catch (err) {
+            console.error("ToggleSubItemChunk Error:", err);
+            if (showToast) showToast('Alt görev güncellenirken hata oluştu!', 'error');
+        }
+    };
+
     const toggleHabit = (habitId) => {
         const doneHabits = currentDayData.habits || [];
         const isDone = doneHabits.includes(habitId);
@@ -434,6 +500,7 @@ function useStudentData(user, profile, showToast) {
                 initialUnit: initial,
                 unit: mainUnit,
                 totalEstTime: Number(form.estTime) || 0,
+                stepSize: Number(form.stepSize) || 1,
                 projectItems: items
             }]);
             processGlobalTags(items);
@@ -451,6 +518,7 @@ function useStudentData(user, profile, showToast) {
         const newUnit = form.unit !== undefined ? form.unit : (p.unit || 'br');
         const newEstTime = form.estTime !== undefined && form.estTime !== '' ? Number(form.estTime) : Number(p.totalEstTime) || 0;
         const newCurrent = form.current !== undefined && form.current !== '' ? Number(form.current) : Number(p.currentUnit) || 0;
+        const newStepSize = form.stepSize !== undefined && form.stepSize !== '' ? Number(form.stepSize) : Number(p.stepSize) || 1;
 
         if (newTotal <= 0) { if (!confirm('⚠️ Toplam birim 0 veya negatif. Yine de kaydetmek istiyor musun?')) return; }
         else if (newCurrent > newTotal) { if (!confirm(`⚠️ Yapılan (${newCurrent}) toplam hedeften (${newTotal}) büyük. Yine de kaydetmek istiyor musun?`)) return; }
@@ -464,7 +532,7 @@ function useStudentData(user, profile, showToast) {
         const updatedProjects = projects.map(proj => proj.id === p.id ? {
             ...proj, title: newTitle, category: newCategory, totalUnit: newTotal,
             unit: newUnit, totalEstTime: newEstTime, currentUnit: newCurrent,
-            initialUnit: newInitial, projectItems: items
+            initialUnit: newInitial, stepSize: newStepSize, projectItems: items
         } : proj);
 
         updateCloud('projects', updatedProjects);
@@ -512,7 +580,7 @@ function useStudentData(user, profile, showToast) {
         openModal, closeModal,
         closeNotification,
         handleAddTask,
-        toggleTask, toggleSubItem, toggleHabit, deleteTask,
+        toggleTask, toggleSubItem, toggleSubItemChunk, toggleHabit, deleteTask,
         addHabit, deleteHabit,
         handleAddProject, handleEditProject, handleDeleteProject,
         handleBuyReward, handleAddReward, handleDeleteReward,

@@ -1864,6 +1864,43 @@ const StudentSimulator = ({ studentId }) => {
         updateCloud(`history/${dateKey}/tasks`, updatedTasks);
     };
 
+    const toggleSubItemChunk = (taskId, chunkIdx) => {
+        const task = currentDayData.tasks.find(t => t.id === taskId);
+        if (!task || !task.subItems) return;
+        
+        const stepSize = Number(task.stepSize) || 1;
+        const startIndex = chunkIdx * stepSize;
+        const endIndex = Math.min(startIndex + stepSize, task.subItems.length);
+        
+        const newSubItems = [...task.subItems];
+        let isFullyDone = true;
+        for (let i = startIndex; i < endIndex; i++) {
+            if (!newSubItems[i]) { isFullyDone = false; break; }
+        }
+        
+        for (let i = startIndex; i < endIndex; i++) {
+            newSubItems[i] = !isFullyDone;
+        }
+
+        const itemsChangedCount = isFullyDone ? -(endIndex - startIndex) : (endIndex - startIndex);
+
+        if (task.type === 'project_slice') {
+            const targetProject = projects.find(p => String(p.id).replace("ID_", "") === String(task.pid).replace("ID_", ""));
+            if (targetProject) {
+                const newCurrent = Math.max(0, targetProject.currentUnit + itemsChangedCount);
+                const updatedProjects = projects.map(p => String(p.id).replace("ID_", "") === String(task.pid).replace("ID_", "") ? { ...p, currentUnit: newCurrent } : p);
+                updateCloud('projects', updatedProjects);
+            }
+        }
+        const allDone = newSubItems.every(i => i === true);
+        db.ref(`users/${student.uid}/gold`).set((gold || 0) + (itemsChangedCount * 5));
+        const updatedTasks = currentDayData.tasks.map(t => {
+            if (t.id === taskId) return { ...t, subItems: newSubItems, completed: allDone, lastActivityAt: Date.now() };
+            return t;
+        });
+        updateCloud(`history/${dateKey}/tasks`, updatedTasks);
+    };
+
     const deleteTask = (id) => {
         // Mentor mode: always allow deletion (override any lock)
         const tasks = currentDayData.tasks || [];
@@ -1919,6 +1956,7 @@ const StudentSimulator = ({ studentId }) => {
                     handleAddTask={handleAddTask}
                     toggleTask={toggleTask}
                     toggleSubItem={toggleSubItem}
+                    toggleSubItemChunk={toggleSubItemChunk}
                     deleteTask={deleteTask}
                     addHabit={addHabit}
                     deleteHabit={deleteHabit}
@@ -2071,9 +2109,11 @@ const StudentDetailModal = ({ student, classes, onClose, showToast }) => {
         };
         
         if (form.projectId) {
+            const p = (student.projects || []).find(proj => String(proj.id) === String(form.projectId));
             newTask.pid = form.projectId;
             newTask.targetAmount = Number(form.amount) || 1;
             newTask.subItems = new Array(newTask.targetAmount).fill(false);
+            newTask.stepSize = p?.stepSize || 1;
         }
 
         const currentTasks = (student.history && student.history[targetK] && student.history[targetK].tasks) || [];
