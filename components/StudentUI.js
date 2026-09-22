@@ -2451,10 +2451,8 @@ const StudentUI = ({
                                 })()}
                                 <input placeholder="Hedef Adı (örn: Matematik)" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.title !== undefined ? form.title : (modal.data?.title ?? '')} onChange={e => setForm({ ...form, title: e.target.value })} />
                                 
-                                <div className="flex gap-2">
-                                    <input type="number" placeholder="Ana Toplam Hedef (Örn: 400)" className="flex-1 p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.total !== undefined ? form.total : (modal.data?.totalUnit ?? '')} onChange={e => setForm({ ...form, total: e.target.value })} />
-                                    <input placeholder="Ana Birim (Örn: Sayfa)" className="w-1/3 p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.unit !== undefined ? form.unit : (modal.data?.unit ?? '')} onChange={e => setForm({ ...form, unit: e.target.value })} />
-                                </div>
+                                <input type="number" placeholder="Ana Toplam Hedef (Örn: 400)" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.total !== undefined ? form.total : (modal.data?.totalUnit ?? '')} onChange={e => setForm({ ...form, total: e.target.value })} />
+                                <input placeholder="Ana Birim (Örn: Sayfa)" className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.unit !== undefined ? form.unit : (modal.data?.unit ?? '')} onChange={e => setForm({ ...form, unit: e.target.value })} />
                                 <input type="number" placeholder="Kaç Birimde 1 Tik (Örn: 5)" title="Örneğin 20 sayfalık bir görevde, bu alana 5 yazarsanız ekranda sadece 4 adet tıklanabilir kutucuk oluşur." className="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl font-bold text-gray-700 dark:text-slate-100 outline-none" value={form.stepSize !== undefined ? form.stepSize : (modal.data?.stepSize ?? '')} onChange={e => setForm({ ...form, stepSize: e.target.value })} />
 
                                 <div className="bg-gray-50 dark:bg-slate-700/50 p-4 rounded-xl space-y-3 border border-gray-100 dark:border-slate-600">
