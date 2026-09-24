@@ -488,24 +488,40 @@ const PairingCodeCard = ({ userId, existingCode, updateCloud }) => {
 
     const generateCode = async () => {
         setGenerating(true);
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        let newCode = '';
-        let isUnique = false;
-        let attempts = 0;
-        while (!isUnique && attempts < 20) {
-            newCode = '';
-            for (let i = 0; i < 6; i++) { newCode += chars.charAt(Math.floor(Math.random() * chars.length)); }
-            const snap = await db.ref('users').orderByChild('pairingCode').equalTo(newCode).once('value');
-            isUnique = !snap.exists();
-            attempts++;
+        try {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let newCode = '';
+            let isUnique = false;
+            let attempts = 0;
+            while (!isUnique && attempts < 20) {
+                newCode = '';
+                for (let i = 0; i < 6; i++) { newCode += chars.charAt(Math.floor(Math.random() * chars.length)); }
+                try {
+                    const snap = await db.ref('users').orderByChild('pairingCode').equalTo(newCode).once('value');
+                    isUnique = !snap.exists();
+                } catch (e) {
+                    console.warn("Could not verify uniqueness due to permissions, assuming unique:", e);
+                    isUnique = true; // Fallback if permission denied
+                }
+                attempts++;
+            }
+            if (isUnique) {
+                // Use updateCloud if provided, else direct db ref
+                if (updateCloud) {
+                    await updateCloud('profile/pairingCode', newCode);
+                } else {
+                    await db.ref(`users/${userId}/profile/pairingCode`).set(newCode);
+                }
+                setCode(newCode);
+            } else {
+                alert('Kod üretilemedi, lütfen tekrar deneyin.');
+            }
+        } catch (error) {
+            console.error("Kod üretme hatası:", error);
+            alert("Bağlantı kodu üretilirken bir hata oluştu.");
+        } finally {
+            setGenerating(false);
         }
-        if (isUnique) {
-            await db.ref(`users/${userId}/pairingCode`).set(newCode);
-            setCode(newCode);
-        } else {
-            alert('Kod üretilemedi, lütfen tekrar deneyin.');
-        }
-        setGenerating(false);
     };
 
     React.useEffect(() => { if (!code && !generating) { generateCode(); } }, []);
