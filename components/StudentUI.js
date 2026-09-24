@@ -1345,17 +1345,37 @@ const StudentUI = ({
         return "Isınma turlarındayız! Temelleri atıyorsun, haftaya vitesi artırıp gerçek potansiyelini göstereceğine eminim.";
     };
 
-    const getRank = (h) => {
-        if (h >= 26) return { emoji: '💎', title: 'Yenilmez Makine', gradient: 'linear-gradient(135deg, #6366f1, #a855f7, #ec4899)', textColor: '#fff', next: null, threshold: 26 };
-        if (h >= 24) return { emoji: '🚀', title: 'Efsanevi Momentum', gradient: 'linear-gradient(135deg, #f59e0b, #ef4444)', textColor: '#fff', next: 26, threshold: 24 };
-        if (h >= 21) return { emoji: '🛡️', title: 'Disiplin Ustası', gradient: 'linear-gradient(135deg, #3b82f6, #6366f1)', textColor: '#fff', next: 24, threshold: 21 };
-        if (h >= 17) return { emoji: '⚔️', title: 'İstikrarlı Savaşçı', gradient: 'linear-gradient(135deg, #ef4444, #f97316)', textColor: '#fff', next: 21, threshold: 17 };
-        if (h >= 12) return { emoji: '🎯', title: 'Odak Avcısı', gradient: 'linear-gradient(135deg, #10b981, #059669)', textColor: '#fff', next: 17, threshold: 12 };
-        if (h >= 8) return { emoji: '🚶‍♂️', title: 'Isınma Turu', gradient: 'linear-gradient(135deg, #f59e0b, #fbbf24)', textColor: '#78350f', next: 12, threshold: 8 };
-        if (h >= 4) return { emoji: '🌱', title: 'Odak Çaylağı', gradient: 'linear-gradient(135deg, #a3e635, #65a30d)', textColor: '#fff', next: 8, threshold: 4 };
-        return { emoji: '💤', title: 'Uyuyan Dev', gradient: 'linear-gradient(135deg, #94a3b8, #64748b)', textColor: '#fff', next: 4, threshold: 0 };
+    const RANKS = [
+        { emoji: '💤', title: 'Uyuyan Dev', gradient: 'linear-gradient(135deg, #94a3b8, #64748b)', textColor: '#fff', threshold: 0 },
+        { emoji: '🌱', title: 'Odak Çaylağı', gradient: 'linear-gradient(135deg, #a3e635, #65a30d)', textColor: '#fff', threshold: 4 },
+        { emoji: '🚶‍♂️', title: 'Isınma Turu', gradient: 'linear-gradient(135deg, #f59e0b, #fbbf24)', textColor: '#78350f', threshold: 8 },
+        { emoji: '🎯', title: 'Odak Avcısı', gradient: 'linear-gradient(135deg, #10b981, #059669)', textColor: '#fff', threshold: 12 },
+        { emoji: '⚔️', title: 'İstikrarlı Savaşçı', gradient: 'linear-gradient(135deg, #ef4444, #f97316)', textColor: '#fff', threshold: 17 },
+        { emoji: '🛡️', title: 'Disiplin Ustası', gradient: 'linear-gradient(135deg, #3b82f6, #6366f1)', textColor: '#fff', threshold: 21 },
+        { emoji: '🚀', title: 'Efsanevi Momentum', gradient: 'linear-gradient(135deg, #f59e0b, #ef4444)', textColor: '#fff', threshold: 24 },
+        { emoji: '💎', title: 'Yenilmez Makine', gradient: 'linear-gradient(135deg, #6366f1, #a855f7, #ec4899)', textColor: '#fff', threshold: 26 },
+    ];
+    
+    const getRankInfo = (h) => {
+        let currentIdx = 0;
+        for (let i = RANKS.length - 1; i >= 0; i--) {
+            if (h >= RANKS[i].threshold) {
+                currentIdx = i;
+                break;
+            }
+        }
+        return {
+            current: RANKS[currentIdx],
+            prev: currentIdx > 0 ? RANKS[currentIdx - 1] : null,
+            next: currentIdx < RANKS.length - 1 ? RANKS[currentIdx + 1] : null,
+        };
     };
-    const rank = getRank(weeklyHours);
+    const rankInfo = getRankInfo(weeklyHours);
+    const rank = rankInfo.current;
+    // adding next and threshold to rank to not break existing code immediately
+    if (rankInfo.next) {
+        rank.next = rankInfo.next.threshold;
+    }
 
     const renderHeader = () => (
         <div className="flex justify-between items-start px-5 pt-12 pb-2 bg-white dark:bg-slate-800 sticky top-0 z-20">
@@ -1599,26 +1619,31 @@ const StudentUI = ({
     const renderMonthView = () => (
         <div className="px-5 pb-24 animate-fade-in">
             <div className="mb-4 -mx-0">
-                <div className="relative overflow-hidden rounded-2xl p-4" style={{ background: rank.gradient }}>
+                <div onClick={() => openModal('ranks')} className="relative overflow-hidden rounded-2xl p-4 cursor-pointer hover:opacity-90 transition-opacity shadow-sm" style={{ background: rank.gradient }}>
                     <div className="absolute top-0 right-0 opacity-10 text-[80px] leading-none -mt-2 -mr-2 select-none">{rank.emoji}</div>
                     <div className="relative z-10">
-                        <div className="flex items-center gap-3 mb-2">
-                            <span className="text-2xl">{rank.emoji}</span>
-                            <div>
-                                <div className="font-black text-sm" style={{ color: rank.textColor }}>{rank.title}</div>
-                                <div className="text-[10px] font-bold opacity-80" style={{ color: rank.textColor }}>
-                                    Son 7 Gün: {Math.floor(weeklyHours)}s {Math.round(weeklyFocusMin % 60)}dk
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                                <span className="text-2xl">{rank.emoji}</span>
+                                <div>
+                                    <div className="font-black text-sm" style={{ color: rank.textColor }}>{rank.title}</div>
+                                    <div className="text-[10px] font-bold opacity-80" style={{ color: rank.textColor }}>
+                                        Son 7 Gün: {Math.floor(weeklyHours)}s {Math.round(weeklyFocusMin % 60)}dk
+                                    </div>
                                 </div>
+                            </div>
+                            <div className="bg-white/20 rounded-full p-1.5 backdrop-blur-sm">
+                                <Icons.ChevronRight />
                             </div>
                         </div>
                         {rank.next && (
-                            <div>
-                                <div className="flex justify-between text-[9px] font-bold mb-1 opacity-70" style={{ color: rank.textColor }}>
-                                    <span>{rank.threshold}s</span>
-                                    <span>{rank.next}s</span>
+                            <div className="mt-1">
+                                <div className="flex justify-between text-[10px] font-bold mb-1.5 opacity-90" style={{ color: rank.textColor }}>
+                                    <span className="flex items-center gap-1">{rankInfo.prev ? `${rankInfo.prev.emoji} ${rankInfo.prev.title}` : `🏁 Başlangıç`} ({rank.threshold}s)</span>
+                                    <span className="flex items-center gap-1">{rankInfo.next ? `${rankInfo.next.title} ${rankInfo.next.emoji}` : `Zirve`} ({rank.next}s)</span>
                                 </div>
-                                <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
-                                    <div className="h-full bg-white/80 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, ((weeklyHours - rank.threshold) / (rank.next - rank.threshold)) * 100)}%` }} />
+                                <div className="h-1.5 bg-white/30 rounded-full overflow-hidden">
+                                    <div className="h-full bg-white rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(255,255,255,0.5)]" style={{ width: `${Math.min(100, ((weeklyHours - rank.threshold) / (rank.next - rank.threshold)) * 100)}%` }} />
                                 </div>
                             </div>
                         )}
@@ -2263,6 +2288,38 @@ const StudentUI = ({
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in backdrop-blur-sm">
                     <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-sm p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto no-scrollbar">
                         <button onClick={() => { localStorage.setItem('pulseShown_' + todayKey, 'true'); closeModal(); }} className="absolute top-4 right-4 text-gray-400 dark:text-slate-400 hover:text-gray-600"><Icons.Close /></button>
+
+                        {modal.type === 'ranks' && (
+                            <div className="space-y-4 pt-2">
+                                <div className="text-center mb-6">
+                                    <div className="text-4xl mb-2">🏆</div>
+                                    <h2 className="text-xl font-black text-gray-800 dark:text-slate-100">Ligler ve Rütbeler</h2>
+                                    <p className="text-xs font-bold text-gray-400 mt-1">Haftalık odaklanma sürene göre ligin belirlenir</p>
+                                </div>
+                                <div className="space-y-3">
+                                    {RANKS.map((r, i) => {
+                                        const isCurrent = rankInfo.current.title === r.title;
+                                        const isPast = weeklyHours >= r.threshold;
+                                        return (
+                                            <div key={i} className={`p-4 rounded-2xl border transition-all flex items-center gap-4 ${isCurrent ? 'ring-2 ring-indigo-500 shadow-xl scale-105' : isPast ? 'opacity-80' : 'opacity-40 grayscale border-dashed'}`} style={{ background: isCurrent ? r.gradient : 'var(--tw-colors-gray-50)', borderColor: isCurrent ? 'transparent' : 'var(--tw-colors-gray-200)' }}>
+                                                <div className="text-3xl drop-shadow-md">{r.emoji}</div>
+                                                <div className="flex-1">
+                                                    <div className={`font-black text-sm ${isCurrent ? 'text-white' : 'text-gray-800 dark:text-slate-100'}`}>{r.title}</div>
+                                                    <div className={`text-[10px] font-bold mt-0.5 ${isCurrent ? 'text-white/80' : 'text-gray-500'}`}>
+                                                        {i === RANKS.length - 1 ? `${r.threshold} saat ve üzeri` : `${r.threshold} - ${RANKS[i + 1].threshold} saat arası`}
+                                                    </div>
+                                                </div>
+                                                {isCurrent && <div className="bg-white/20 px-3 py-1 rounded-full text-white text-[10px] font-black backdrop-blur-sm shadow-sm">ŞU AN</div>}
+                                                {isPast && !isCurrent && <div className="text-green-500/80"><Icons.Check /></div>}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                                <div className="pt-4">
+                                    <button onClick={closeModal} className="w-full bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 font-bold py-3 rounded-xl hover:bg-gray-200 transition">Anladım</button>
+                                </div>
+                            </div>
+                        )}
 
                         {modal.type === 'templates' && (
                             <div className="space-y-4">
