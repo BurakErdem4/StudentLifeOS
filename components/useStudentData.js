@@ -635,6 +635,46 @@ function useStudentData(user, profile, showToast) {
         closeModal();
     };
 
+    const handleArchiveCategory = async (path) => {
+        if (!path) return;
+        try {
+            // Find all projects in this category or subcategories
+            const projectsToArchive = projects.filter(p => {
+                const pCat = p.category || '';
+                return pCat === path || pCat.startsWith(path + '/');
+            });
+            
+            if (projectsToArchive.length === 0) {
+                if (window.showToast) window.showToast('Bu kategoride hedef bulunamadı', 'info');
+                return;
+            }
+
+            const snap = await db.ref(`users/${user.uid}/archivedProjects`).once('value');
+            let archived = snap.val() || [];
+            if (!Array.isArray(archived)) archived = Object.values(archived);
+            
+            // Add all projects to archive, avoiding duplicates
+            projectsToArchive.forEach(proj => {
+                if (!archived.find(p => p.id === proj.id)) {
+                    archived.push(proj);
+                }
+            });
+            await db.ref(`users/${user.uid}/archivedProjects`).set(archived);
+            
+            // Remove from active projects
+            const updatedProjects = projects.filter(p => {
+                const pCat = p.category || '';
+                return pCat !== path && !pCat.startsWith(path + '/');
+            });
+            updateCloud('projects', updatedProjects);
+            if (window.showToast) window.showToast(`${projectsToArchive.length} hedef arşivlendi 📦`, 'info');
+            closeModal();
+        } catch (error) {
+            console.error("Archive category error:", error);
+            alert("Kategori arşivleme sırasında hata oluştu. Lütfen tekrar dene.");
+        }
+    };
+
     const handleDeleteCategory = (path, deleteProjects = false) => {
         if (!path) return;
         let updatedProjects;
@@ -680,7 +720,7 @@ function useStudentData(user, profile, showToast) {
         toggleTask, toggleSubItem, toggleSubItemChunk, toggleHabit, deleteTask,
         addHabit, deleteHabit,
         handleAddProject, handleEditProject, handleDeleteProject, handleArchiveProject,
-        handleRenameCategory, handleDeleteCategory,
+        handleRenameCategory, handleDeleteCategory, handleArchiveCategory,
         handleBuyReward, handleAddReward, handleDeleteReward,
         handleStartFocus, handleStopFocus
     };

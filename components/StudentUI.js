@@ -1066,7 +1066,7 @@ const StudentUI = ({
     focusMode, setFocusMode, modal, openModal, closeModal, form, setForm,
     notificationModal, closeNotification,
     handleAddProject, handleEditProject, handleDeleteProject, handleArchiveProject,
-    handleRenameCategory, handleDeleteCategory,
+    handleRenameCategory, handleDeleteCategory, handleArchiveCategory,
     handleAddTask, toggleTask, toggleSubItem, toggleSubItemChunk, deleteTask,
     addHabit, deleteHabit, toggleHabit,
     handlePurchase, handleStartFocus, handleStopFocus,
@@ -2746,6 +2746,18 @@ const StudentUI = ({
                                             className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition"
                                         >
                                             Yeniden Adlandır
+                                        </button>
+                                        <div className="h-px w-full bg-gray-100 dark:bg-slate-700 my-2"></div>
+                                        <label className="text-xs font-bold text-gray-500 dark:text-slate-400 mb-1">Arşivleme Seçenekleri</label>
+                                        <button
+                                            onClick={() => {
+                                                if (confirm('Bu kategori altındaki tüm hedefler arşivlenecektir (Ana ekrandan gizlenecek, veriler korunacaktır). Emin misin?')) {
+                                                    handleArchiveCategory(fullPath);
+                                                }
+                                            }}
+                                            className="w-full bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30 py-3 rounded-xl font-bold hover:bg-amber-100 dark:hover:bg-amber-900/40 transition flex items-center justify-center gap-2"
+                                        >
+                                            📦 İçindeki Hedeflerle Birlikte Arşivle
                                         </button>
                                         <div className="h-px w-full bg-gray-100 dark:bg-slate-700 my-2"></div>
                                         <label className="text-xs font-bold text-gray-500 dark:text-slate-400 mb-1">Silme Seçenekleri</label>
