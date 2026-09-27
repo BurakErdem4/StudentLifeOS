@@ -1002,6 +1002,62 @@ const PRESET_CATEGORIES = [
         ].filter(Boolean)
     }
 ];
+const ArchivedProjectsModal = ({ user, projects, updateCloud, openModal }) => {
+    const [archivedList, setArchivedList] = React.useState(null);
+    React.useEffect(() => {
+        if(typeof db !== 'undefined' && user) {
+            db.ref(`users/${user.uid}/archivedProjects`).once('value').then(snap => {
+                let vals = snap.val() || [];
+                if(!Array.isArray(vals)) vals = Object.values(vals);
+                setArchivedList(vals);
+            }).catch(e => {
+                console.error(e);
+                setArchivedList([]);
+            });
+        }
+    }, [user]);
+
+    const handleUnarchive = async (project) => {
+        if(!window.confirm(`'${project.title}' hedefini tekrar aktif hedeflere taşımak istediğine emin misin?`)) return;
+        try {
+            const updatedArchived = archivedList.filter(p => p.id !== project.id);
+            await db.ref(`users/${user.uid}/archivedProjects`).set(updatedArchived);
+            setArchivedList(updatedArchived);
+            updateCloud('projects', [...projects, project]);
+            if(window.showToast) window.showToast('Hedef geri yüklendi', 'success');
+        } catch(e) {
+            alert("Geri yükleme sırasında hata oluştu.");
+        }
+    };
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center gap-3 mb-6">
+                <button onClick={() => openModal('settings')} className="p-2 -ml-2 text-gray-400 dark:text-slate-400 hover:text-gray-600 transition"><Icons.ChevronLeft /></button>
+                <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Arşivlenmiş Hedefler</h2>
+            </div>
+            <div className="space-y-3 max-h-[500px] overflow-y-auto no-scrollbar">
+                {archivedList === null ? (
+                    <div className="text-center py-8 text-gray-400">Yükleniyor...</div>
+                ) : archivedList.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400 text-sm">Arşivlenmiş hedefin yok.</div>
+                ) : (
+                    archivedList.map(p => (
+                        <div key={p.id} className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 p-4 rounded-2xl flex items-center justify-between shadow-sm">
+                            <div className="flex items-center gap-3">
+                                <div className="text-2xl">{p.icon || '📦'}</div>
+                                <div className="font-bold text-gray-700 dark:text-slate-200">{p.title}</div>
+                            </div>
+                            <button onClick={() => handleUnarchive(p)} className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition">
+                                Geri Yükle
+                            </button>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+    );
+};
 
 const StudentUI = ({
     user, profile, activeTab, setActiveTab, selectedDate, setSelectedDate,
@@ -3323,62 +3379,9 @@ const StudentUI = ({
                                 </div>
                             </div>
                         )}
-                        {modal.type === 'settings_archived_projects' && (() => {
-                            const [archivedList, setArchivedList] = React.useState(null);
-                            React.useEffect(() => {
-                                if(typeof db !== 'undefined' && user) {
-                                    db.ref(`users/${user.uid}/archivedProjects`).once('value').then(snap => {
-                                        let vals = snap.val() || [];
-                                        if(!Array.isArray(vals)) vals = Object.values(vals);
-                                        setArchivedList(vals);
-                                    }).catch(e => {
-                                        console.error(e);
-                                        setArchivedList([]);
-                                    });
-                                }
-                            }, []);
-
-                            const handleUnarchive = async (project) => {
-                                if(!window.confirm(`'${project.title}' hedefini tekrar aktif hedeflere taşımak istediğine emin misin?`)) return;
-                                try {
-                                    const updatedArchived = archivedList.filter(p => p.id !== project.id);
-                                    await db.ref(`users/${user.uid}/archivedProjects`).set(updatedArchived);
-                                    setArchivedList(updatedArchived);
-                                    updateCloud('projects', [...projects, project]);
-                                    if(window.showToast) window.showToast('Hedef geri yüklendi', 'success');
-                                } catch(e) {
-                                    alert("Geri yükleme sırasında hata oluştu.");
-                                }
-                            };
-
-                            return (
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-3 mb-6">
-                                        <button onClick={() => openModal('settings')} className="p-2 -ml-2 text-gray-400 dark:text-slate-400 hover:text-gray-600 transition"><Icons.ChevronLeft /></button>
-                                        <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Arşivlenmiş Hedefler</h2>
-                                    </div>
-                                    <div className="space-y-3 max-h-[500px] overflow-y-auto no-scrollbar">
-                                        {archivedList === null ? (
-                                            <div className="text-center py-8 text-gray-400">Yükleniyor...</div>
-                                        ) : archivedList.length === 0 ? (
-                                            <div className="text-center py-8 text-gray-400 text-sm">Arşivlenmiş hedefin yok.</div>
-                                        ) : (
-                                            archivedList.map(p => (
-                                                <div key={p.id} className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 p-4 rounded-2xl flex items-center justify-between shadow-sm">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="text-2xl">{p.icon || '📦'}</div>
-                                                        <div className="font-bold text-gray-700 dark:text-slate-200">{p.title}</div>
-                                                    </div>
-                                                    <button onClick={() => handleUnarchive(p)} className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition">
-                                                        Geri Yükle
-                                                    </button>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })()}
+                        {modal.type === 'settings_archived_projects' && (
+                            <ArchivedProjectsModal user={user} projects={projects} updateCloud={updateCloud} openModal={openModal} />
+                        )}
 
 
                         {modal.type === 'settings_routines' && (
