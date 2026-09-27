@@ -1030,27 +1030,64 @@ const ArchivedProjectsModal = ({ user, projects, updateCloud, openModal }) => {
         }
     };
 
+    const handleUnarchiveCategory = async (catName, items) => {
+        if(!window.confirm(`'${catName}' kategorisindeki tüm hedefleri (${items.length} adet) tekrar aktif hedeflere taşımak istediğine emin misin?`)) return;
+        try {
+            const itemIds = items.map(i => i.id);
+            const updatedArchived = archivedList.filter(p => !itemIds.includes(p.id));
+            await db.ref(`users/${user.uid}/archivedProjects`).set(updatedArchived);
+            setArchivedList(updatedArchived);
+            updateCloud('projects', [...projects, ...items]);
+            if(window.showToast) window.showToast(`${items.length} hedef geri yüklendi`, 'success');
+        } catch(e) {
+            alert("Geri yükleme sırasında hata oluştu.");
+        }
+    };
+
+    const grouped = {};
+    if (archivedList) {
+        archivedList.forEach(p => {
+            const cat = (p.category || 'Kategorisiz').split('/')[0];
+            if(!grouped[cat]) grouped[cat] = [];
+            grouped[cat].push(p);
+        });
+    }
+
     return (
         <div className="space-y-4">
             <div className="flex items-center gap-3 mb-6">
                 <button onClick={() => openModal('settings')} className="p-2 -ml-2 text-gray-400 dark:text-slate-400 hover:text-gray-600 transition"><Icons.ChevronLeft /></button>
                 <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Arşivlenmiş Hedefler</h2>
             </div>
-            <div className="space-y-3 max-h-[500px] overflow-y-auto no-scrollbar">
+            <div className="space-y-4 max-h-[500px] overflow-y-auto no-scrollbar pb-10">
                 {archivedList === null ? (
                     <div className="text-center py-8 text-gray-400">Yükleniyor...</div>
                 ) : archivedList.length === 0 ? (
                     <div className="text-center py-8 text-gray-400 text-sm">Arşivlenmiş hedefin yok.</div>
                 ) : (
-                    archivedList.map(p => (
-                        <div key={p.id} className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 p-4 rounded-2xl flex items-center justify-between shadow-sm">
-                            <div className="flex items-center gap-3">
-                                <div className="text-2xl">{p.icon || '📦'}</div>
-                                <div className="font-bold text-gray-700 dark:text-slate-200">{p.title}</div>
+                    Object.entries(grouped).map(([catName, items]) => (
+                        <div key={catName} className="bg-gray-50 dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 overflow-hidden">
+                            <div className="flex justify-between items-center p-3 bg-gray-100/50 dark:bg-slate-700/50 border-b border-gray-100 dark:border-slate-600">
+                                <div className="font-bold text-gray-700 dark:text-slate-300 flex items-center gap-2">
+                                    <Icons.Folder /> {catName} <span className="text-xs text-gray-400 dark:text-slate-500">({items.length})</span>
+                                </div>
+                                <button onClick={() => handleUnarchiveCategory(catName, items)} className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg text-xs font-bold hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition">
+                                    Tümünü Yükle
+                                </button>
                             </div>
-                            <button onClick={() => handleUnarchive(p)} className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition">
-                                Geri Yükle
-                            </button>
+                            <div className="p-2 space-y-2">
+                                {items.map(p => (
+                                    <div key={p.id} className="bg-white dark:bg-slate-700 p-3 rounded-xl flex items-center justify-between shadow-sm border border-gray-50 dark:border-slate-600">
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <div className="text-xl shrink-0">{p.icon || '📦'}</div>
+                                            <div className="font-bold text-sm text-gray-700 dark:text-slate-200 truncate">{p.title}</div>
+                                        </div>
+                                        <button onClick={() => handleUnarchive(p)} className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 rounded-lg text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition shrink-0 ml-2">
+                                            Yükle
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     ))
                 )}
