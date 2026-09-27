@@ -1069,7 +1069,7 @@ const ArchivedProjectsModal = ({ user, projects, updateCloud, openModal }) => {
                         <div key={catName} className="bg-gray-50 dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 overflow-hidden">
                             <div className="flex justify-between items-center p-3 bg-gray-100/50 dark:bg-slate-700/50 border-b border-gray-100 dark:border-slate-600">
                                 <div className="font-bold text-gray-700 dark:text-slate-300 flex items-center gap-2">
-                                    <Icons.Folder /> {catName} <span className="text-xs text-gray-400 dark:text-slate-500">({items.length})</span>
+                                    <span>📁</span> {catName} <span className="text-xs text-gray-400 dark:text-slate-500">({items.length})</span>
                                 </div>
                                 <button onClick={() => handleUnarchiveCategory(catName, items)} className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg text-xs font-bold hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition">
                                     Tümünü Yükle
