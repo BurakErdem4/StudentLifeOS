@@ -148,16 +148,18 @@ function useStudentData(user, profile, showToast) {
             const tasks = dayData.tasks || [];
             const hasTask = tasks.some(t => t.completed || (t.subItems && t.subItems.some(Boolean)));
             const hasHabit = (dayData.habits || []).length > 0;
-            return !(hasTask && hasHabit);
+            return !(hasTask && hasHabit); // Reverted back to AND as per user request
         };
         let freezesLeft = streakFreeze;
-        for (let i = 3; i >= 1 && freezesLeft > 0; i--) {
+        for (let i = 3; i >= 1; i--) {
             const d = new Date();
             d.setDate(d.getDate() - i);
             const key = gdk(d);
             const dayData = history[key];
             
             if (isDayFailed(dayData)) {
+                if (dayData && dayData.streakBroken) continue; // Once a streak breaks, it cannot be repaired retroactively
+
                 // Check if previous day was qualified (has a streak to protect)
                 const prevD = new Date(d);
                 prevD.setDate(prevD.getDate() - 1);
@@ -166,17 +168,26 @@ function useStudentData(user, profile, showToast) {
                 const isPrevQualified = !isDayFailed(prevDayData);
                 
                 if (isPrevQualified) {
-                    updateCloud(`history/${key}/frozen`, true);
-                    freezesLeft--;
-                    updateCloud('streakFreeze', freezesLeft);
-                    
-                    // Mutate locally so the next iteration sees it as qualified
-                    if (!history[key]) history[key] = {};
-                    history[key].frozen = true;
+                    if (freezesLeft > 0) {
+                        updateCloud(`history/${key}/frozen`, true);
+                        freezesLeft--;
+                        updateCloud('streakFreeze', freezesLeft);
+                        
+                        if (window.showToast) window.showToast(`${d.toLocaleDateString('tr-TR', {weekday: 'long'})} günkü serini kurtarmak için otomatik Dondurucu kullanıldı 🧊`, 'info');
+                        
+                        // Mutate locally so the next iteration sees it as qualified
+                        if (!history[key]) history[key] = {};
+                        history[key].frozen = true;
+                    } else {
+                        // Out of freezes. The streak permanently breaks here.
+                        updateCloud(`history/${key}/streakBroken`, true);
+                        if (!history[key]) history[key] = {};
+                        history[key].streakBroken = true;
+                    }
                 }
             }
         }
-    }, [user, history, streakFreeze]);
+    }, [user, history]); // Removed streakFreeze from dependencies to avoid running on purchase
 
     // --- MODAL ---
     const closeModal = () => {
