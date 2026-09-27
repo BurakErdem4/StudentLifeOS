@@ -1796,21 +1796,24 @@ const StudentUI = ({
 
                     return (
                         <button key={d} onClick={() => { setSelectedDate(new Date(dateStr)); setCalendarMode('day'); }}
-                            className={`aspect-square rounded-full flex items-center justify-center text-xs font-bold transition-all relative ${borderClass}`}
+                            className={`w-9 h-9 md:w-10 md:h-10 mx-auto rounded-full flex items-center justify-center text-xs font-bold transition-all relative ${borderClass}`}
                             style={totalCount > 0 ? bgStyle : {}}>
 
                             {/* HABIT RINGS */}
                             {totalHabits > 0 && (
-                                <div className="absolute inset-0 -m-1 pointer-events-none">
+                                <div className="absolute -inset-1.5 md:-inset-2 pointer-events-none">
                                     <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
                                         {new Array(totalHabits).fill(null).map((_, idx) => {
                                             const isCompleted = idx < completedHabitsCount;
                                             const color = isCompleted ? '#FFD700' : '#E5E7EB'; // Real Gold vs Gray
-                                            const strokeDash = (250 / totalHabits) - 4; // 4 is gap
+                                            const circumference = 276; // 2 * PI * 44 = 276.46
+                                            const gap = totalHabits > 1 ? 6 : 0;
+                                            const strokeDash = (circumference / totalHabits) - gap;
+                                            const remainder = circumference - strokeDash;
                                             return (
-                                                <circle key={idx} cx="50" cy="50" r="46"
-                                                    fill="none" stroke={color} strokeWidth="6"
-                                                    strokeDasharray={`${strokeDash} ${314 - strokeDash}`} // approx circ
+                                                <circle key={idx} cx="50" cy="50" r="44"
+                                                    fill="none" stroke={color} strokeWidth="12"
+                                                    strokeDasharray={`${strokeDash} ${remainder}`}
                                                     strokeDashoffset={0}
                                                     transform={`rotate(${(360 / totalHabits) * idx} 50 50)`}
                                                 />
@@ -1821,7 +1824,7 @@ const StudentUI = ({
                             )}
 
                             <span className="relative z-10">{d}</span>
-                            {isToday && !totalCount && <div className="absolute -bottom-1 w-1 h-1 rounded-full bg-indigo-500 z-10"></div>}
+                            {isToday && !totalCount && <div className="absolute -bottom-1.5 w-1 h-1 rounded-full bg-indigo-500 z-10"></div>}
                         </button>
                     );
                 })}
