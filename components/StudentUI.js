@@ -1009,7 +1009,7 @@ const StudentUI = ({
     flippedProjects, setFlippedProjects,
     focusMode, setFocusMode, modal, openModal, closeModal, form, setForm,
     notificationModal, closeNotification,
-    handleAddProject, handleEditProject, handleDeleteProject,
+    handleAddProject, handleEditProject, handleDeleteProject, handleArchiveProject,
     handleRenameCategory, handleDeleteCategory,
     handleAddTask, toggleTask, toggleSubItem, toggleSubItemChunk, deleteTask,
     addHabit, deleteHabit, toggleHabit,
@@ -2858,6 +2858,9 @@ const StudentUI = ({
                                         <button onClick={() => { openModal('delete_project', modal.data); }} className="bg-red-50 dark:bg-red-900/20 text-red-500 border border-red-100 dark:border-red-900/30 p-3 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/40 transition flex items-center justify-center aspect-square" title="Hedefi Sil">
                                             <Icons.Trash />
                                         </button>
+                                        <button onClick={() => { if(window.confirm('Bu hedefi arşivlemek istediğine emin misin? (Veriler korunur ancak ana ekranda gözükmez)')) handleArchiveProject(modal.data); }} className="bg-amber-50 dark:bg-amber-900/20 text-amber-600 border border-amber-100 dark:border-amber-900/30 p-3 rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/40 transition flex items-center justify-center aspect-square" title="Hedefi Arşivle">
+                                            📦
+                                        </button>
                                         <button onClick={handleEditProject} className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">Kaydet</button>
                                     </div>
                                 ) : (
@@ -2904,6 +2907,13 @@ const StudentUI = ({
                                             💬
                                         </div>
                                         <span className="flex-1 text-left dark:text-slate-200">Mentordan Mesajlar</span>
+                                        <Icons.ChevronRight />
+                                    </button>
+                                    <button onClick={() => openModal('settings_archived_projects')} className="w-full bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 p-4 rounded-2xl font-bold text-gray-700 flex items-center gap-4 hover:border-gray-200 transition group">
+                                        <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-500/20 text-amber-600 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+                                            📦
+                                        </div>
+                                        <span className="flex-1 text-left dark:text-slate-200">Arşivlenmiş Hedefler</span>
                                         <Icons.ChevronRight />
                                     </button>
                                 </div>
@@ -3313,6 +3323,63 @@ const StudentUI = ({
                                 </div>
                             </div>
                         )}
+                        {modal.type === 'settings_archived_projects' && (() => {
+                            const [archivedList, setArchivedList] = React.useState(null);
+                            React.useEffect(() => {
+                                if(typeof db !== 'undefined' && user) {
+                                    db.ref(`users/${user.uid}/archivedProjects`).once('value').then(snap => {
+                                        let vals = snap.val() || [];
+                                        if(!Array.isArray(vals)) vals = Object.values(vals);
+                                        setArchivedList(vals);
+                                    }).catch(e => {
+                                        console.error(e);
+                                        setArchivedList([]);
+                                    });
+                                }
+                            }, []);
+
+                            const handleUnarchive = async (project) => {
+                                if(!window.confirm(`'${project.title}' hedefini tekrar aktif hedeflere taşımak istediğine emin misin?`)) return;
+                                try {
+                                    const updatedArchived = archivedList.filter(p => p.id !== project.id);
+                                    await db.ref(`users/${user.uid}/archivedProjects`).set(updatedArchived);
+                                    setArchivedList(updatedArchived);
+                                    updateCloud('projects', [...projects, project]);
+                                    if(window.showToast) window.showToast('Hedef geri yüklendi', 'success');
+                                } catch(e) {
+                                    alert("Geri yükleme sırasında hata oluştu.");
+                                }
+                            };
+
+                            return (
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-3 mb-6">
+                                        <button onClick={() => openModal('settings')} className="p-2 -ml-2 text-gray-400 dark:text-slate-400 hover:text-gray-600 transition"><Icons.ChevronLeft /></button>
+                                        <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Arşivlenmiş Hedefler</h2>
+                                    </div>
+                                    <div className="space-y-3 max-h-[500px] overflow-y-auto no-scrollbar">
+                                        {archivedList === null ? (
+                                            <div className="text-center py-8 text-gray-400">Yükleniyor...</div>
+                                        ) : archivedList.length === 0 ? (
+                                            <div className="text-center py-8 text-gray-400 text-sm">Arşivlenmiş hedefin yok.</div>
+                                        ) : (
+                                            archivedList.map(p => (
+                                                <div key={p.id} className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 p-4 rounded-2xl flex items-center justify-between shadow-sm">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="text-2xl">{p.icon || '📦'}</div>
+                                                        <div className="font-bold text-gray-700 dark:text-slate-200">{p.title}</div>
+                                                    </div>
+                                                    <button onClick={() => handleUnarchive(p)} className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition">
+                                                        Geri Yükle
+                                                    </button>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
 
                         {modal.type === 'settings_routines' && (
                             <div className="space-y-6">

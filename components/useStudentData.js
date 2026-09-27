@@ -558,6 +558,21 @@ function useStudentData(user, profile, showToast) {
         closeModal();
     };
 
+    const handleArchiveProject = async (project) => {
+        if (!project || !project.id) return;
+        try {
+            const snap = await db.ref(`users/${user.uid}/archivedProjects`).once('value');
+            let archived = snap.val() || [];
+            if (!Array.isArray(archived)) archived = Object.values(archived);
+            archived.push(project);
+            await db.ref(`users/${user.uid}/archivedProjects`).set(archived);
+            updateCloud('projects', projects.filter(p => p.id !== project.id));
+            if (window.showToast) window.showToast('Hedef arşivlendi 📦', 'info');
+        } catch (error) {
+            console.error("Archive error:", error);
+            alert("Arşivleme sırasında hata oluştu.");
+        }
+    };
     const handleDeleteProject = (id) => updateCloud('projects', projects.filter(p => p.id !== id));
 
     // --- REWARD ACTIONS ---
@@ -658,7 +673,7 @@ function useStudentData(user, profile, showToast) {
         handleAddTask,
         toggleTask, toggleSubItem, toggleSubItemChunk, toggleHabit, deleteTask,
         addHabit, deleteHabit,
-        handleAddProject, handleEditProject, handleDeleteProject,
+        handleAddProject, handleEditProject, handleDeleteProject, handleArchiveProject,
         handleRenameCategory, handleDeleteCategory,
         handleBuyReward, handleAddReward, handleDeleteReward,
         handleStartFocus, handleStopFocus
