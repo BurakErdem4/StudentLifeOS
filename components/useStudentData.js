@@ -564,13 +564,19 @@ function useStudentData(user, profile, showToast) {
             const snap = await db.ref(`users/${user.uid}/archivedProjects`).once('value');
             let archived = snap.val() || [];
             if (!Array.isArray(archived)) archived = Object.values(archived);
-            archived.push(project);
-            await db.ref(`users/${user.uid}/archivedProjects`).set(archived);
+            
+            // Check if it's already there to avoid duplicates
+            if (!archived.find(p => p.id === project.id)) {
+                archived.push(project);
+                await db.ref(`users/${user.uid}/archivedProjects`).set(archived);
+            }
+            
             updateCloud('projects', projects.filter(p => p.id !== project.id));
             if (window.showToast) window.showToast('Hedef arşivlendi 📦', 'info');
+            closeModal();
         } catch (error) {
             console.error("Archive error:", error);
-            alert("Arşivleme sırasında hata oluştu.");
+            alert("Arşivleme sırasında hata oluştu. Lütfen tekrar dene.");
         }
     };
     const handleDeleteProject = (id) => updateCloud('projects', projects.filter(p => p.id !== id));
