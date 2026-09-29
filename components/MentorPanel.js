@@ -308,18 +308,24 @@ const MentorAppointmentsView = ({ students, db }) => {
 
     const [selectedSlot, setSelectedSlot] = React.useState(null); // { ts, hourStr }
     const [selectedStudentId, setSelectedStudentId] = React.useState('');
+    const [studentSearch, setStudentSearch] = React.useState('');
 
-    // Extract all appointments
-    const appointments = [];
-    students.forEach(s => {
-        if (s.appointments) {
-            Object.values(s.appointments).forEach(app => {
-                appointments.push({ ...app, studentId: s.uid, studentName: s.profile?.name || 'Bilinmeyen Öğrenci' });
-            });
-        }
-    });
+    // Extract all appointments and keep them in local state for instant UI updates
+    const [appointments, setAppointments] = React.useState([]);
+    
+    React.useEffect(() => {
+        const apps = [];
+        students.forEach(s => {
+            if (s.appointments) {
+                Object.values(s.appointments).forEach(app => {
+                    apps.push({ ...app, studentId: s.uid, studentName: s.profile?.name || 'Bilinmeyen Öğrenci' });
+                });
+            }
+        });
+        setAppointments(apps);
+    }, [students]);
 
-    const hours = Array.from({length: 13}, (_, i) => i + 9); // 09:00 to 21:00
+    const hours = Array.from({length: 10}, (_, i) => i + 9); // 09:00 to 18:00
     const days = [0, 1, 2, 3, 4, 5, 6].map(offset => {
         const d = new Date(currentWeekStart);
         d.setDate(d.getDate() + offset);
@@ -352,19 +358,29 @@ const MentorAppointmentsView = ({ students, db }) => {
         if (!selectedSlot || !selectedStudentId) return;
         const ts = selectedSlot.ts;
         const id = Date.now();
-        await db.ref(`users/${selectedStudentId}/appointments/${id}`).set({
+        const newApp = {
             id,
             timestamp: ts,
             note: 'Mentor Görüşmesi'
-        });
+        };
+        await db.ref(`users/${selectedStudentId}/appointments/${id}`).set(newApp);
+        
+        setAppointments(prev => [...prev, {
+            ...newApp,
+            studentId: selectedStudentId,
+            studentName: students.find(s => s.uid === selectedStudentId)?.profile?.name || 'Bilinmeyen Öğrenci'
+        }]);
+        
         setSelectedSlot(null);
         setSelectedStudentId('');
+        setStudentSearch('');
         if (window.showToast) window.showToast('Randevu oluşturuldu!', 'success');
     };
 
     const handleDelete = async (studentId, appId) => {
         if (!confirm('Bu randevuyu silmek istediğine emin misin?')) return;
         await db.ref(`users/${studentId}/appointments/${appId}`).remove();
+        setAppointments(prev => prev.filter(a => a.id !== appId));
         if (window.showToast) window.showToast('Randevu iptal edildi.', 'info');
     };
 
@@ -447,7 +463,7 @@ const MentorAppointmentsView = ({ students, db }) => {
                     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm p-6 border border-gray-100 dark:border-slate-700">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-lg text-gray-900 dark:text-slate-100">Randevu Ata</h3>
-                            <button onClick={() => setSelectedSlot(null)} className="text-gray-400 hover:text-gray-600">×</button>
+                            <button onClick={() => { setSelectedSlot(null); setStudentSearch(''); }} className="text-gray-400 hover:text-gray-600">×</button>
                         </div>
                         
                         <div className="mb-5 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl p-3 text-center border border-indigo-100 dark:border-indigo-900/50">
@@ -456,18 +472,32 @@ const MentorAppointmentsView = ({ students, db }) => {
                             <div className="text-xl font-black text-indigo-600 dark:text-indigo-400">{selectedSlot.hourStr}</div>
                         </div>
 
-                        <div className="space-y-3 mb-6">
+                        <div className="space-y-3 mb-6 relative">
                             <label className="text-xs font-bold text-gray-500">Öğrenci Seç</label>
-                            <select 
-                                value={selectedStudentId} 
-                                onChange={e => setSelectedStudentId(e.target.value)}
+                            <input 
+                                type="text"
+                                placeholder="İsimle öğrenci ara..."
+                                value={studentSearch}
+                                onChange={e => { setStudentSearch(e.target.value); setSelectedStudentId('');
+        setStudentSearch(''); }}
                                 className="w-full p-3 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
-                            >
-                                <option value="">-- Öğrenci Seçin --</option>
-                                {students.map(s => (
-                                    <option key={s.uid} value={s.uid}>{s.profile?.name || 'Bilinmiyor'} ({s.profile?.classId || 'Sınıfsız'})</option>
-                                ))}
-                            </select>
+                            />
+                            {studentSearch && !selectedStudentId && (
+                                <div className="absolute top-[100%] left-0 w-full max-h-48 overflow-y-auto bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 shadow-xl rounded-xl z-50">
+                                    {students.filter(s => (s.profile?.name || '').toLowerCase().includes(studentSearch.toLowerCase())).map(s => (
+                                        <div 
+                                            key={s.uid} 
+                                            onClick={() => { setSelectedStudentId(s.uid); setStudentSearch(s.profile?.name || ''); }}
+                                            className="p-3 hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer border-b border-gray-50 dark:border-slate-700 last:border-0 text-sm font-bold text-gray-700 dark:text-slate-200"
+                                        >
+                                            {s.profile?.name || 'Bilinmiyor'} <span className="text-xs text-gray-400 font-normal">({s.profile?.classId || 'Sınıfsız'})</span>
+                                        </div>
+                                    ))}
+                                    {students.filter(s => (s.profile?.name || '').toLowerCase().includes(studentSearch.toLowerCase())).length === 0 && (
+                                        <div className="p-3 text-center text-gray-400 text-sm">Sonuç bulunamadı.</div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <button 
