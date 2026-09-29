@@ -385,7 +385,7 @@ const MentorAppointmentsView = ({ students, db }) => {
     };
 
     return (
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden flex flex-col h-full min-h-[600px]">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden flex flex-col h-full">
             <div className="p-4 border-b border-gray-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-50/50 dark:bg-slate-800/50">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center text-xl">📅</div>
@@ -432,7 +432,7 @@ const MentorAppointmentsView = ({ students, db }) => {
                                 const isPast = new Date(d).setHours(hour, 59, 59) < Date.now();
                                 
                                 return (
-                                    <div key={i} className="border-r border-gray-100 dark:border-slate-700 last:border-0 p-1 min-h-[60px] relative group hover:bg-gray-50 dark:hover:bg-slate-700/50 transition">
+                                    <div key={i} className="border-r border-gray-100 dark:border-slate-700 last:border-0 p-1 h-12 relative group hover:bg-gray-50 dark:hover:bg-slate-700/50 transition">
                                         {appt ? (
                                             <div className={`w-full h-full rounded-lg p-1.5 flex flex-col justify-between border ${isPast ? 'bg-gray-100 border-gray-200 opacity-60' : 'bg-indigo-50 border-indigo-200 shadow-sm'}`}>
                                                 <div className="text-[10px] font-bold text-indigo-900 dark:text-indigo-800 truncate leading-tight">{appt.studentName}</div>
@@ -478,8 +478,7 @@ const MentorAppointmentsView = ({ students, db }) => {
                                 type="text"
                                 placeholder="İsimle öğrenci ara..."
                                 value={studentSearch}
-                                onChange={e => { setStudentSearch(e.target.value); setSelectedStudentId('');
-        setStudentSearch(''); }}
+                                onChange={e => { setStudentSearch(e.target.value); setSelectedStudentId(''); }}
                                 className="w-full p-3 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
                             />
                             {studentSearch && !selectedStudentId && (
@@ -1113,7 +1112,7 @@ const MentorDashboard = ({ currentUser, showToast }) => {
                     {loading ? <div className="text-center text-gray-400 dark:text-slate-400 py-10">Yükleniyor...</div> : (
                         <>
                             {isAppointmentsView ? (
-                                <div className="mt-4 h-[calc(100vh-200px)]">
+                                <div className="mt-4">
                                     <MentorAppointmentsView students={students} db={db} />
                                 </div>
                             ) : isDataView ? (
