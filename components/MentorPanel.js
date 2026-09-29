@@ -486,21 +486,37 @@ const MentorAppointmentsView = ({ students, db }) => {
                             />
                             {isDropdownOpen && !selectedStudentId && (
                                 <div className="absolute top-[100%] left-0 w-full max-h-48 overflow-y-auto bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 shadow-xl rounded-xl z-50">
-                                    {[...students]
-                                        .sort((a, b) => (a.profile?.name || '').localeCompare(b.profile?.name || '', 'tr'))
-                                        .filter(s => (s.profile?.name || '').toLowerCase().includes(studentSearch.toLowerCase()))
-                                        .map(s => (
-                                        <div 
-                                            key={s.uid} 
-                                            onClick={() => { setSelectedStudentId(s.uid); setStudentSearch(s.profile?.name || ''); setIsDropdownOpen(false); }}
-                                            className="p-3 hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer border-b border-gray-50 dark:border-slate-700 last:border-0 text-sm font-bold text-gray-700 dark:text-slate-200"
-                                        >
-                                            {s.profile?.name || 'Bilinmiyor'} <span className="text-xs text-gray-400 font-normal">({s.profile?.classId || 'Sınıfsız'})</span>
-                                        </div>
-                                    ))}
-                                    {[...students].filter(s => (s.profile?.name || '').toLowerCase().includes(studentSearch.toLowerCase())).length === 0 && (
-                                        <div className="p-3 text-center text-gray-400 text-sm">Sonuç bulunamadı.</div>
-                                    )}
+                                    {(() => {
+                                        const searchStr = studentSearch.toLowerCase();
+                                        const filtered = [...students].filter(s => (s.profile?.name || '').toLowerCase().includes(searchStr));
+                                        
+                                        filtered.sort((a, b) => {
+                                            const nameA = (a.profile?.name || '').toLowerCase();
+                                            const nameB = (b.profile?.name || '').toLowerCase();
+                                            
+                                            const aStarts = nameA.startsWith(searchStr);
+                                            const bStarts = nameB.startsWith(searchStr);
+                                            
+                                            if (aStarts && !bStarts) return -1;
+                                            if (!aStarts && bStarts) return 1;
+                                            
+                                            return nameA.localeCompare(nameB, 'tr');
+                                        });
+
+                                        if (filtered.length === 0) {
+                                            return <div className="p-3 text-center text-gray-400 text-sm">Sonuç bulunamadı.</div>;
+                                        }
+
+                                        return filtered.map(s => (
+                                            <div 
+                                                key={s.uid} 
+                                                onClick={() => { setSelectedStudentId(s.uid); setStudentSearch(s.profile?.name || ''); setIsDropdownOpen(false); }}
+                                                className="p-3 hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer border-b border-gray-50 dark:border-slate-700 last:border-0 text-sm font-bold text-gray-700 dark:text-slate-200"
+                                            >
+                                                {s.profile?.name || 'Bilinmiyor'} <span className="text-xs text-gray-400 font-normal">({s.profile?.classId || 'Sınıfsız'})</span>
+                                            </div>
+                                        ));
+                                    })()}
                                 </div>
                             )}
                         </div>
