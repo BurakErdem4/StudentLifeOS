@@ -1098,7 +1098,7 @@ const ArchivedProjectsModal = ({ user, projects, updateCloud, openModal }) => {
 
 const StudentUI = ({
     user, profile, activeTab, setActiveTab, selectedDate, setSelectedDate,
-    projects, history, habits, rewards, gold, flippedCards, setFlippedCards,
+    projects, history, habits, rewards, gold, appointments, flippedCards, setFlippedCards,
     flippedProjects, setFlippedProjects,
     focusMode, setFocusMode, modal, openModal, closeModal, form, setForm,
     notificationModal, closeNotification,
@@ -1545,6 +1545,35 @@ const StudentUI = ({
 
     const renderDayView = () => (
         <div className="px-5 pb-24 space-y-6 animate-fade-in">
+            {(() => {
+                const sDate = new Date(selectedDate);
+                const dayAppts = Object.values(appointments || {}).filter(a => {
+                    const aDate = new Date(a.timestamp);
+                    return aDate.getFullYear() === sDate.getFullYear() && aDate.getMonth() === sDate.getMonth() && aDate.getDate() === sDate.getDate();
+                });
+                if (dayAppts.length === 0) return null;
+                return (
+                    <div className="space-y-3">
+                        {dayAppts.map(a => (
+                            <div key={a.id} className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-4 rounded-3xl shadow-lg border border-indigo-400/30 relative overflow-hidden flex items-center justify-between group cursor-pointer hover:shadow-indigo-500/20 transition-all">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none group-hover:scale-110 transition-transform duration-500"></div>
+                                <div className="relative z-10 flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl backdrop-blur-sm shadow-inner border border-white/20">
+                                        👨‍🏫
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] font-bold text-indigo-100 uppercase tracking-wider mb-0.5 opacity-90">MENTOR GÖRÜŞMESİ</div>
+                                        <div className="font-extrabold text-lg leading-tight flex items-center gap-2">
+                                            Bugün {new Date(a.timestamp).toLocaleTimeString('tr-TR', {hour: '2-digit', minute: '2-digit'})}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                );
+            })()}
+
             <div className="bg-white dark:bg-slate-800 rounded-3xl p-5 border border-gray-100 dark:border-slate-700 shadow-sm">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="font-bold text-gray-400 dark:text-slate-400 text-xs uppercase tracking-wider">GÜNLÜK RUTİNLER</h3>
@@ -1794,6 +1823,11 @@ const StudentUI = ({
                     const totalHabits = habits.length;
                     const completedHabitsCount = dayHabits.length;
 
+                    const dayHasAppt = Object.values(appointments || {}).some(a => {
+                        const aDate = new Date(a.timestamp);
+                        return aDate.getFullYear() === currentMonth.getFullYear() && aDate.getMonth() === currentMonth.getMonth() && aDate.getDate() === d;
+                    });
+
                     return (
                         <button key={d} onClick={() => { setSelectedDate(new Date(dateStr)); setCalendarMode('day'); }}
                             className={`w-9 h-9 md:w-10 md:h-10 mx-auto rounded-full flex items-center justify-center text-xs font-bold transition-all relative ${borderClass}`}
@@ -1824,6 +1858,7 @@ const StudentUI = ({
                             )}
 
                             <span className="relative z-10">{d}</span>
+                            {dayHasAppt && <div className="absolute -top-1.5 -right-1.5 bg-indigo-500 w-4 h-4 rounded-full flex items-center justify-center text-[9px] z-20 shadow-sm border border-white dark:border-slate-800" title="Mentor Görüşmesi">💬</div>}
                             {isToday && !totalCount && <div className="absolute -bottom-1.5 w-1 h-1 rounded-full bg-indigo-500 z-10"></div>}
                         </button>
                     );

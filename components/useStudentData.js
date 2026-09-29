@@ -18,6 +18,7 @@ function useStudentData(user, profile, showToast) {
     const [rewards, setRewards] = useState([]);
     const [gold, setGold] = useState(0);
     const [streakFreeze, setStreakFreeze] = useState(0);
+    const [appointments, setAppointments] = useState({});
     const [flippedCards, setFlippedCards] = useState({});
     const [flippedProjects, setFlippedProjects] = useState({});
     const [focusMode, setFocusMode] = useState({ active: false, taskId: null, taskTitle: '', timeLeft: 0, isRunning: false, initialTimeLeft: 0 });
@@ -88,6 +89,7 @@ function useStudentData(user, profile, showToast) {
                 setRewards(data.rewards || DEFAULT_REWARDS);
                 setGold(data.gold || 0);
                 setStreakFreeze(data.streakFreeze || 0);
+                setAppointments(data.appointments || {});
             }
         });
         return () => userRef.off();
@@ -714,7 +716,8 @@ function useStudentData(user, profile, showToast) {
         activeTab, setActiveTab,
         selectedDate, setSelectedDate,
         projects, history, habits, rewards, gold,
-        streakFreeze, flippedCards, setFlippedCards,
+        streakFreeze,
+        appointments, flippedCards, setFlippedCards,
         flippedProjects, setFlippedProjects,
         focusMode, setFocusMode,
         modal, form, setForm,

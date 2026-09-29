@@ -297,6 +297,194 @@
         };
 
 
+const MentorAppointmentsView = ({ students, db }) => {
+    const [currentWeekStart, setCurrentWeekStart] = React.useState(() => {
+        const d = new Date();
+        d.setHours(0,0,0,0);
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1); 
+        return new Date(d.setDate(diff)).getTime();
+    });
+
+    const [selectedSlot, setSelectedSlot] = React.useState(null); // { ts, hourStr }
+    const [selectedStudentId, setSelectedStudentId] = React.useState('');
+
+    // Extract all appointments
+    const appointments = [];
+    students.forEach(s => {
+        if (s.appointments) {
+            Object.values(s.appointments).forEach(app => {
+                appointments.push({ ...app, studentId: s.uid, studentName: s.profile?.name || 'Bilinmeyen Öğrenci' });
+            });
+        }
+    });
+
+    const hours = Array.from({length: 13}, (_, i) => i + 9); // 09:00 to 21:00
+    const days = [0, 1, 2, 3, 4, 5, 6].map(offset => {
+        const d = new Date(currentWeekStart);
+        d.setDate(d.getDate() + offset);
+        return d;
+    });
+
+    const nextWeek = () => setCurrentWeekStart(prev => prev + 7 * 24 * 60 * 60 * 1000);
+    const prevWeek = () => setCurrentWeekStart(prev => prev - 7 * 24 * 60 * 60 * 1000);
+    const goToday = () => {
+        const d = new Date();
+        d.setHours(0,0,0,0);
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1); 
+        setCurrentWeekStart(new Date(d.setDate(diff)).getTime());
+    };
+
+    const monthNames = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+    const dayNames = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
+
+    const getApptForSlot = (date, hour) => {
+        const slotStart = new Date(date);
+        slotStart.setHours(hour, 0, 0, 0);
+        const slotEnd = new Date(date);
+        slotEnd.setHours(hour, 59, 59, 999);
+        
+        return appointments.find(a => a.timestamp >= slotStart.getTime() && a.timestamp <= slotEnd.getTime());
+    };
+
+    const handleAssign = async () => {
+        if (!selectedSlot || !selectedStudentId) return;
+        const ts = selectedSlot.ts;
+        const id = Date.now();
+        await db.ref(`users/${selectedStudentId}/appointments/${id}`).set({
+            id,
+            timestamp: ts,
+            note: 'Mentor Görüşmesi'
+        });
+        setSelectedSlot(null);
+        setSelectedStudentId('');
+        if (window.showToast) window.showToast('Randevu oluşturuldu!', 'success');
+    };
+
+    const handleDelete = async (studentId, appId) => {
+        if (!confirm('Bu randevuyu silmek istediğine emin misin?')) return;
+        await db.ref(`users/${studentId}/appointments/${appId}`).remove();
+        if (window.showToast) window.showToast('Randevu iptal edildi.', 'info');
+    };
+
+    return (
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden flex flex-col h-full min-h-[600px]">
+            <div className="p-4 border-b border-gray-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-50/50 dark:bg-slate-800/50">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center text-xl">📅</div>
+                    <div>
+                        <h2 className="font-bold text-gray-800 dark:text-slate-100 text-lg">Haftalık Randevu Takvimi</h2>
+                        <div className="text-xs text-gray-500">{new Date(currentWeekStart).getDate()} {monthNames[new Date(currentWeekStart).getMonth()]} - {days[6].getDate()} {monthNames[days[6].getMonth()]}</div>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2 bg-white dark:bg-slate-700 p-1 rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm">
+                    <button onClick={prevWeek} className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-600 rounded-md transition text-gray-600 dark:text-slate-300">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"></path></svg>
+                    </button>
+                    <button onClick={goToday} className="px-3 py-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-md transition">Bugün</button>
+                    <button onClick={nextWeek} className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-600 rounded-md transition text-gray-600 dark:text-slate-300">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div className="flex-1 overflow-auto bg-gray-50 dark:bg-slate-900 relative p-4">
+                <div className="min-w-[700px] bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
+                    {/* Header */}
+                    <div className="grid grid-cols-8 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-750">
+                        <div className="p-3 text-center text-xs font-bold text-gray-400 border-r border-gray-200 dark:border-slate-700">SAAT</div>
+                        {days.map((d, i) => {
+                            const isToday = new Date().toDateString() === d.toDateString();
+                            return (
+                                <div key={i} className={`p-3 text-center border-r border-gray-200 dark:border-slate-700 last:border-0 ${isToday ? 'bg-indigo-50/50 dark:bg-indigo-900/10' : ''}`}>
+                                    <div className={`text-xs font-bold ${isToday ? 'text-indigo-600' : 'text-gray-500'}`}>{dayNames[i]}</div>
+                                    <div className={`text-lg font-black mt-0.5 ${isToday ? 'text-indigo-700 dark:text-indigo-400' : 'text-gray-800 dark:text-slate-200'}`}>{d.getDate()}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Grid */}
+                    {hours.map(hour => (
+                        <div key={hour} className="grid grid-cols-8 border-b border-gray-100 dark:border-slate-700 last:border-0">
+                            <div className="p-2 text-center text-xs font-bold text-gray-400 border-r border-gray-200 dark:border-slate-700 flex items-center justify-center bg-gray-50 dark:bg-slate-750">
+                                {String(hour).padStart(2, '0')}:00
+                            </div>
+                            {days.map((d, i) => {
+                                const appt = getApptForSlot(d, hour);
+                                const isPast = new Date(d).setHours(hour, 59, 59) < Date.now();
+                                
+                                return (
+                                    <div key={i} className="border-r border-gray-100 dark:border-slate-700 last:border-0 p-1 min-h-[60px] relative group hover:bg-gray-50 dark:hover:bg-slate-700/50 transition">
+                                        {appt ? (
+                                            <div className={`w-full h-full rounded-lg p-1.5 flex flex-col justify-between border ${isPast ? 'bg-gray-100 border-gray-200 opacity-60' : 'bg-indigo-50 border-indigo-200 shadow-sm'}`}>
+                                                <div className="text-[10px] font-bold text-indigo-900 dark:text-indigo-800 truncate leading-tight">{appt.studentName}</div>
+                                                <button onClick={() => handleDelete(appt.studentId, appt.id)} className="opacity-0 group-hover:opacity-100 absolute top-1 right-1 bg-red-100 text-red-600 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold hover:bg-red-500 hover:text-white transition cursor-pointer z-10">×</button>
+                                            </div>
+                                        ) : (
+                                            <button 
+                                                onClick={() => {
+                                                    const slotD = new Date(d);
+                                                    slotD.setHours(hour, 0, 0, 0);
+                                                    setSelectedSlot({ ts: slotD.getTime(), dateStr: slotD.toLocaleDateString('tr-TR', {weekday:'long', day:'numeric', month:'long'}), hourStr: `${String(hour).padStart(2,'0')}:00` });
+                                                }}
+                                                className="w-full h-full rounded-lg border-2 border-dashed border-transparent hover:border-gray-300 dark:hover:border-slate-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer"
+                                            >
+                                                <span className="text-gray-400 text-xl">+</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {selectedSlot && (
+                <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm p-6 border border-gray-100 dark:border-slate-700">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-lg text-gray-900 dark:text-slate-100">Randevu Ata</h3>
+                            <button onClick={() => setSelectedSlot(null)} className="text-gray-400 hover:text-gray-600">×</button>
+                        </div>
+                        
+                        <div className="mb-5 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl p-3 text-center border border-indigo-100 dark:border-indigo-900/50">
+                            <div className="text-xs font-bold text-indigo-400 uppercase mb-1">Seçili Zaman</div>
+                            <div className="text-sm font-bold text-indigo-700 dark:text-indigo-300">{selectedSlot.dateStr}</div>
+                            <div className="text-xl font-black text-indigo-600 dark:text-indigo-400">{selectedSlot.hourStr}</div>
+                        </div>
+
+                        <div className="space-y-3 mb-6">
+                            <label className="text-xs font-bold text-gray-500">Öğrenci Seç</label>
+                            <select 
+                                value={selectedStudentId} 
+                                onChange={e => setSelectedStudentId(e.target.value)}
+                                className="w-full p-3 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
+                            >
+                                <option value="">-- Öğrenci Seçin --</option>
+                                {students.map(s => (
+                                    <option key={s.uid} value={s.uid}>{s.profile?.name || 'Bilinmiyor'} ({s.profile?.classId || 'Sınıfsız'})</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <button 
+                            onClick={handleAssign}
+                            disabled={!selectedStudentId}
+                            className="w-full py-3 rounded-xl font-bold text-white shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-indigo-500 to-blue-500 hover:shadow-md hover:from-indigo-600 hover:to-blue-600"
+                        >
+                            Randevuyu Kaydet
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+
 const MentorDashboard = ({ currentUser, showToast }) => {
     const [students, setStudents] = useState([]);
     const [classes, setClasses] = useState([]);
@@ -834,11 +1022,12 @@ const MentorDashboard = ({ currentUser, showToast }) => {
 
         // Data view ise accordion açık olsun
         const isDataView = panelView === 'data';
+        const isAppointmentsView = panelView === 'appointments';
 
         // Sub-view title/description
-        const subViewTitle = isDataView ? 'Veri Yönetimi' : view === 'classes' ? 'Sınıflar & Gruplar' : 'Tüm Öğrenciler';
-        const subViewEmoji = isDataView ? '📊' : view === 'classes' ? '🏫' : '🎓';
-        const subViewDesc = isDataView ? 'Verileri dışa aktar, yedekle veya toplu yükleme yap.' : view === 'classes' ? 'Sınıfları yönet ve öğrencileri grupla.' : `${displayedStudents.length} öğrenci listeleniyor.`;
+        const subViewTitle = isAppointmentsView ? 'Randevu Takvimi' : isDataView ? 'Veri Yönetimi' : view === 'classes' ? 'Sınıflar & Gruplar' : 'Tüm Öğrenciler';
+        const subViewEmoji = isAppointmentsView ? '📅' : isDataView ? '📊' : view === 'classes' ? '🏫' : '🎓';
+        const subViewDesc = isAppointmentsView ? 'Tüm öğrenci görüşmelerini haftalık takvimde planla.' : isDataView ? 'Verileri dışa aktar, yedekle veya toplu yükleme yap.' : view === 'classes' ? 'Sınıfları yönet ve öğrencileri grupla.' : `${displayedStudents.length} öğrenci listeleniyor.`;
 
         return (
             <div className="flex flex-col h-full bg-gray-100 dark:bg-slate-900 text-gray-800 dark:text-slate-100">
@@ -893,7 +1082,11 @@ const MentorDashboard = ({ currentUser, showToast }) => {
                 <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-6">
                     {loading ? <div className="text-center text-gray-400 dark:text-slate-400 py-10">Yükleniyor...</div> : (
                         <>
-                            {isDataView ? (
+                            {isAppointmentsView ? (
+                                <div className="mt-4 h-[calc(100vh-200px)]">
+                                    <MentorAppointmentsView students={students} db={db} />
+                                </div>
+                            ) : isDataView ? (
                                 <div className="space-y-4 mt-4">
                                     {/* Export/Import Cards */}
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1237,13 +1430,12 @@ const MentorDashboard = ({ currentUser, showToast }) => {
                                     <div className="text-[10px] text-gray-400 dark:text-slate-400 mt-0.5">{classes.length} sınıf mevcut</div>
                                 </button>
                                 <button
-                                    disabled
-                                    className="group bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 opacity-60 cursor-not-allowed text-left relative"
+                                    onClick={() => setPanelView('appointments')}
+                                    className="group bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 hover:shadow-lg hover:border-sky-300 dark:hover:border-sky-600 hover:scale-[1.02] transition-all text-left"
                                 >
-                                    <div className="absolute top-3 right-3 bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400 text-[8px] font-bold px-2 py-0.5 rounded-full">YAKINDA</div>
-                                    <div className="w-12 h-12 bg-sky-50 dark:bg-sky-900/30 rounded-xl flex items-center justify-center text-2xl mb-3">💬</div>
-                                    <div className="font-bold text-gray-800 dark:text-slate-100 text-sm">Mesajlar</div>
-                                    <div className="text-[10px] text-gray-400 dark:text-slate-400 mt-0.5">Etkileşimler & bildirimler</div>
+                                    <div className="w-12 h-12 bg-sky-50 dark:bg-sky-900/30 rounded-xl flex items-center justify-center text-2xl mb-3 group-hover:scale-110 transition-transform">📅</div>
+                                    <div className="font-bold text-gray-800 dark:text-slate-100 text-sm">Takvim & Randevular</div>
+                                    <div className="text-[10px] text-gray-400 dark:text-slate-400 mt-0.5">Öğrenci görüşmelerini planla</div>
                                 </button>
                                 <button
                                     onClick={() => setPanelView('data')}
@@ -1988,6 +2180,28 @@ const StudentDetailModal = ({ student, classes, onClose, showToast }) => {
     const [globalTags, setGlobalTags] = useState({ topics: [], sources: [], types: [] });
     const [visibleTaskCount, setVisibleTaskCount] = useState(5);
 
+    const [newApptDate, setNewApptDate] = useState('');
+    const [newApptTime, setNewApptTime] = useState('');
+    const [showPastAppts, setShowPastAppts] = useState(false);
+    
+    const handleAddAppt = async () => {
+        if(!newApptDate || !newApptTime) return;
+        const d = new Date(newApptDate + 'T' + newApptTime);
+        const id = Date.now();
+        await db.ref(`users/${student.uid}/appointments/${id}`).set({
+            id,
+            timestamp: d.getTime(),
+            note: 'Mentor Görüşmesi'
+        });
+        setNewApptDate('');
+        setNewApptTime('');
+        if(showToast) showToast('Randevu eklendi!', 'success');
+    };
+    const appts = student.appointments ? Object.values(student.appointments).sort((a,b)=>b.timestamp - a.timestamp) : [];
+    const pastAppts = appts.filter(a => a.timestamp < Date.now());
+    const futureAppts = appts.filter(a => a.timestamp >= Date.now());
+
+
     useEffect(() => {
         const tagsRef = db.ref('globalTags');
         tagsRef.on('value', (snap) => {
@@ -2519,6 +2733,48 @@ const StudentDetailModal = ({ student, classes, onClose, showToast }) => {
 
                 {activeTab === 'notes' && (
                     <div className="space-y-4 max-w-2xl mx-auto">
+                        {/* Randevu Kutusu */}
+                        <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700">
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="font-bold text-gray-700 dark:text-slate-200 text-sm">📅 Randevu Planla</h3>
+                                {pastAppts.length > 0 && (
+                                    <button onClick={() => setShowPastAppts(!showPastAppts)} className="text-[10px] text-indigo-500 hover:underline font-bold">
+                                        {showPastAppts ? 'Geçmişi Gizle' : 'Geçmiş Randevular (' + pastAppts.length + ')'}
+                                    </button>
+                                )}
+                            </div>
+                            
+                            {showPastAppts && (
+                                <div className="mb-4 bg-gray-50 dark:bg-slate-700/50 p-3 rounded-lg max-h-32 overflow-y-auto">
+                                    {pastAppts.map(a => (
+                                        <div key={a.id} className="text-xs text-gray-500 dark:text-slate-400 py-1 border-b border-gray-200 dark:border-slate-600 last:border-0 flex justify-between">
+                                            <span>{new Date(a.timestamp).toLocaleString('tr-TR', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'})} - {a.note}</span>
+                                            <span className="text-gray-400 font-bold">Tamamlandı</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {futureAppts.length > 0 && (
+                                <div className="mb-4 space-y-2">
+                                    {futureAppts.map(a => (
+                                        <div key={a.id} className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 p-2 rounded-lg text-xs font-bold flex justify-between items-center border border-indigo-100 dark:border-indigo-900/50">
+                                            <span>⏳ Gelecek Randevu: {new Date(a.timestamp).toLocaleString('tr-TR', {day:'numeric', month:'long', hour:'2-digit', minute:'2-digit'})}</span>
+                                            <button onClick={() => {
+                                                if(confirm('İptal etmek istiyor musun?')) db.ref(`users/${student.uid}/appointments/${a.id}`).remove();
+                                            }} className="text-red-500 hover:text-red-700 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded-md transition">İptal</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className="flex gap-2">
+                                <input type="date" value={newApptDate} onChange={e => setNewApptDate(e.target.value)} className="flex-1 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl p-2 text-sm text-gray-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                                <input type="time" value={newApptTime} onChange={e => setNewApptTime(e.target.value)} className="w-24 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl p-2 text-sm text-gray-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                                <button onClick={handleAddAppt} className="px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition shadow-sm whitespace-nowrap">+ Ekle</button>
+                            </div>
+                        </div>
+
                         {/* Not Ekleme Kutusu */}
                         <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700">
                             <h3 className="font-bold text-gray-700 dark:text-slate-200 text-sm mb-3">📝 Yeni Not Ekle</h3>
