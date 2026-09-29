@@ -309,6 +309,7 @@ const MentorAppointmentsView = ({ students, db }) => {
     const [selectedSlot, setSelectedSlot] = React.useState(null); // { ts, hourStr }
     const [selectedStudentId, setSelectedStudentId] = React.useState('');
     const [studentSearch, setStudentSearch] = React.useState('');
+    const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
 
     // Extract all appointments and keep them in local state for instant UI updates
     const [appointments, setAppointments] = React.useState([]);
@@ -476,23 +477,28 @@ const MentorAppointmentsView = ({ students, db }) => {
                             <label className="text-xs font-bold text-gray-500">Öğrenci Seç</label>
                             <input 
                                 type="text"
-                                placeholder="İsimle öğrenci ara..."
+                                placeholder="İsimle veya listeden öğrenci seç..."
                                 value={studentSearch}
-                                onChange={e => { setStudentSearch(e.target.value); setSelectedStudentId(''); }}
+                                onFocus={() => setIsDropdownOpen(true)}
+                                onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
+                                onChange={e => { setStudentSearch(e.target.value); setSelectedStudentId(''); setIsDropdownOpen(true); }}
                                 className="w-full p-3 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
                             />
-                            {studentSearch && !selectedStudentId && (
+                            {isDropdownOpen && !selectedStudentId && (
                                 <div className="absolute top-[100%] left-0 w-full max-h-48 overflow-y-auto bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 shadow-xl rounded-xl z-50">
-                                    {students.filter(s => (s.profile?.name || '').toLowerCase().includes(studentSearch.toLowerCase())).map(s => (
+                                    {[...students]
+                                        .sort((a, b) => (a.profile?.name || '').localeCompare(b.profile?.name || '', 'tr'))
+                                        .filter(s => (s.profile?.name || '').toLowerCase().includes(studentSearch.toLowerCase()))
+                                        .map(s => (
                                         <div 
                                             key={s.uid} 
-                                            onClick={() => { setSelectedStudentId(s.uid); setStudentSearch(s.profile?.name || ''); }}
+                                            onClick={() => { setSelectedStudentId(s.uid); setStudentSearch(s.profile?.name || ''); setIsDropdownOpen(false); }}
                                             className="p-3 hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer border-b border-gray-50 dark:border-slate-700 last:border-0 text-sm font-bold text-gray-700 dark:text-slate-200"
                                         >
                                             {s.profile?.name || 'Bilinmiyor'} <span className="text-xs text-gray-400 font-normal">({s.profile?.classId || 'Sınıfsız'})</span>
                                         </div>
                                     ))}
-                                    {students.filter(s => (s.profile?.name || '').toLowerCase().includes(studentSearch.toLowerCase())).length === 0 && (
+                                    {[...students].filter(s => (s.profile?.name || '').toLowerCase().includes(studentSearch.toLowerCase())).length === 0 && (
                                         <div className="p-3 text-center text-gray-400 text-sm">Sonuç bulunamadı.</div>
                                     )}
                                 </div>
