@@ -1034,7 +1034,7 @@ const MentorDashboard = ({ currentUser, showToast }) => {
 
 
     if (selectedStudent) {
-        return <StudentDetailModal student={selectedStudent} classes={classes} onClose={() => setSelectedStudent(null)} showToast={showToast} />;
+        return <StudentDetailModal student={selectedStudent} classes={classes} onClose={() => setSelectedStudent(null)} showToast={showToast} currentUser={currentUser} />;
     }
 
     // --- DASHBOARD COMPUTATIONS ---
@@ -2220,7 +2220,7 @@ const StudentSimulator = ({ studentId }) => {
     );
 };
 
-const StudentDetailModal = ({ student, classes, onClose, showToast }) => {
+const StudentDetailModal = ({ student, classes, onClose, showToast, currentUser }) => {
     const [activeTab, setActiveTab] = useState('analysis');
     const [form, setForm] = useState({});
     const [newNote, setNewNote] = useState('');
@@ -2235,6 +2235,21 @@ const StudentDetailModal = ({ student, classes, onClose, showToast }) => {
     const [newApptTime, setNewApptTime] = useState('');
     const [showPastAppts, setShowPastAppts] = useState(false);
     
+    const [localAppts, setLocalAppts] = useState([]);
+    
+    useEffect(() => {
+        const ref = db.ref(`users/${student.uid}/appointments`);
+        ref.on('value', snap => {
+            const val = snap.val();
+            if (val) {
+                setLocalAppts(Object.values(val).sort((a,b) => b.timestamp - a.timestamp));
+            } else {
+                setLocalAppts([]);
+            }
+        });
+        return () => ref.off();
+    }, [student.uid]);
+
     const handleAddAppt = async () => {
         if(!newApptDate || !newApptTime) return;
         const d = new Date(newApptDate + 'T' + newApptTime);
@@ -2248,9 +2263,8 @@ const StudentDetailModal = ({ student, classes, onClose, showToast }) => {
         setNewApptTime('');
         if(showToast) showToast('Randevu eklendi!', 'success');
     };
-    const appts = student.appointments ? Object.values(student.appointments).sort((a,b)=>b.timestamp - a.timestamp) : [];
-    const pastAppts = appts.filter(a => a.timestamp < Date.now());
-    const futureAppts = appts.filter(a => a.timestamp >= Date.now());
+    const pastAppts = localAppts.filter(a => a.timestamp < Date.now());
+    const futureAppts = localAppts.filter(a => a.timestamp >= Date.now());
 
 
     useEffect(() => {
@@ -2289,7 +2303,7 @@ const StudentDetailModal = ({ student, classes, onClose, showToast }) => {
     const handleSaveNote = () => {
         if (!newNote.trim()) return;
         const dateTs = noteDate ? new Date(noteDate).setHours(12, 0, 0, 0) : Date.now();
-        db.ref(`users/${student.uid}/mentorNotes`).push({ date: dateTs, text: newNote.trim() });
+        db.ref(`users/${student.uid}/mentorNotes`).push({ date: dateTs, text: newNote.trim(), mentorName: currentUser?.profile?.name || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Mentor' });
         setNewNote('');
         setNoteDate(new Date().toISOString().split('T')[0]);
         if (showToast) showToast('Not kaydedildi 📒', 'success');
@@ -2864,8 +2878,9 @@ const StudentDetailModal = ({ student, classes, onClose, showToast }) => {
                                 {mentorNotes.map(note => (
                                     <div key={note.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
                                         <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-gray-50 dark:border-slate-700">
-                                            <span className="text-[11px] text-gray-400 dark:text-slate-500 font-medium">
-                                                🗓️ {new Date(note.date).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                            <span className="text-[11px] text-gray-400 dark:text-slate-500 font-medium flex items-center gap-2">
+                                                <span>🗓️ {new Date(note.date).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                                {note.mentorName && <span className="bg-gray-100 dark:bg-slate-700 px-2 py-0.5 rounded text-[10px] text-gray-500 dark:text-slate-400 font-bold">👤 {note.mentorName}</span>}
                                             </span>
                                             <div className="flex gap-1">
                                                 <button
