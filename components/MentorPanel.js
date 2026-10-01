@@ -297,7 +297,7 @@
         };
 
 
-const MentorAppointmentsView = ({ students, db }) => {
+const MentorAppointmentsView = ({ students, db, onUpdateStudentAppts }) => {
     const [currentWeekStart, setCurrentWeekStart] = React.useState(() => {
         const d = new Date();
         d.setHours(0,0,0,0);
@@ -366,11 +366,9 @@ const MentorAppointmentsView = ({ students, db }) => {
         };
         await db.ref(`users/${selectedStudentId}/appointments/${id}`).set(newApp);
         
-        setAppointments(prev => [...prev, {
-            ...newApp,
-            studentId: selectedStudentId,
-            studentName: students.find(s => s.uid === selectedStudentId)?.profile?.name || 'Bilinmeyen Öğrenci'
-        }]);
+        const targetStudent = students.find(s => s.uid === selectedStudentId);
+        const updatedAppts = { ...(targetStudent?.appointments || {}), [id]: newApp };
+        if (onUpdateStudentAppts) onUpdateStudentAppts(selectedStudentId, updatedAppts);
         
         setSelectedSlot(null);
         setSelectedStudentId('');
@@ -381,7 +379,14 @@ const MentorAppointmentsView = ({ students, db }) => {
     const handleDelete = async (studentId, appId) => {
         if (!confirm('Bu randevuyu silmek istediğine emin misin?')) return;
         await db.ref(`users/${studentId}/appointments/${appId}`).remove();
-        setAppointments(prev => prev.filter(a => a.id !== appId));
+        
+        const targetStudent = students.find(s => s.uid === studentId);
+        if (targetStudent && targetStudent.appointments) {
+            const updatedAppts = { ...targetStudent.appointments };
+            delete updatedAppts[appId];
+            if (onUpdateStudentAppts) onUpdateStudentAppts(studentId, updatedAppts);
+        }
+        
         if (window.showToast) window.showToast('Randevu iptal edildi.', 'info');
     };
 
@@ -539,6 +544,10 @@ const MentorAppointmentsView = ({ students, db }) => {
 const MentorDashboard = ({ currentUser, showToast }) => {
     const [students, setStudents] = useState([]);
     const [classes, setClasses] = useState([]);
+    
+    const handleUpdateStudentAppts = (studentId, newApptsObj) => {
+        setStudents(prev => prev.map(s => s.uid === studentId ? { ...s, appointments: newApptsObj } : s));
+    };
     const [view, setView] = useState('all'); // 'all', 'classes', or specific classId
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -1034,7 +1043,7 @@ const MentorDashboard = ({ currentUser, showToast }) => {
 
 
     if (selectedStudent) {
-        return <StudentDetailModal student={selectedStudent} classes={classes} onClose={() => setSelectedStudent(null)} showToast={showToast} currentUser={currentUser} />;
+        return <StudentDetailModal student={selectedStudent} classes={classes} onClose={() => setSelectedStudent(null)} showToast={showToast} currentUser={currentUser} onUpdateStudentAppts={handleUpdateStudentAppts} />;
     }
 
     // --- DASHBOARD COMPUTATIONS ---
@@ -1135,7 +1144,7 @@ const MentorDashboard = ({ currentUser, showToast }) => {
                         <>
                             {isAppointmentsView ? (
                                 <div className="mt-4">
-                                    <MentorAppointmentsView students={students} db={db} />
+                                    <MentorAppointmentsView students={students} db={db} onUpdateStudentAppts={handleUpdateStudentAppts} />
                                 </div>
                             ) : isDataView ? (
                                 <div className="space-y-4 mt-4">
@@ -2220,7 +2229,7 @@ const StudentSimulator = ({ studentId }) => {
     );
 };
 
-const StudentDetailModal = ({ student, classes, onClose, showToast, currentUser }) => {
+const StudentDetailModal = ({ student, classes, onClose, showToast, currentUser, onUpdateStudentAppts }) => {
     const [activeTab, setActiveTab] = useState('analysis');
     const [form, setForm] = useState({});
     const [newNote, setNewNote] = useState('');
@@ -2243,8 +2252,10 @@ const StudentDetailModal = ({ student, classes, onClose, showToast, currentUser 
             const val = snap.val();
             if (val) {
                 setLocalAppts(Object.values(val).sort((a,b) => b.timestamp - a.timestamp));
+                if (onUpdateStudentAppts) onUpdateStudentAppts(student.uid, val);
             } else {
                 setLocalAppts([]);
+                if (onUpdateStudentAppts) onUpdateStudentAppts(student.uid, null);
             }
         });
         return () => ref.off();
